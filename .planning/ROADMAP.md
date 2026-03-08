@@ -28,11 +28,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Querying a domain against a populated index returns correct exact and subdomain matches without false positives (e.g., `notmalware.test` is NOT blocked when `malware.test` is in the list)
   4. Allow/deny/blocklist precedence is correct: allowed domains are never blocked, denied domains are always blocked (after allow check), and the result includes structured `BlockDecision` fields
   5. Malformed or unexpected input to `isDomainBlocked` never throws -- returns `{ blocked: false }`
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md — Project setup, types, normalization, and blocklist parsers
+- [ ] 01-02-PLAN.md — Domain matching index, decision logic with precedence, and public API
 
 ### Phase 2: Lifecycle and Configuration
 **Goal**: The library can fetch remote blocklists, wire everything together via a factory API, and manage its own lifecycle including periodic refresh
@@ -71,6 +71,6 @@ Phases execute in numeric order: 1 -> 2 -> 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Core Logic | 0/? | Not started | - |
+| 1. Core Logic | 0/2 | Not started | - |
 | 2. Lifecycle and Configuration | 0/? | Not started | - |
 | 3. Quality and Ship | 0/? | Not started | - |
