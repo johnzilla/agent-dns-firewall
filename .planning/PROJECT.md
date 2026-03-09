@@ -27,17 +27,15 @@ Before your agent calls `fetch()`, you can ask `isDomainBlocked(hostname)` and d
 - ✓ Unit tests for parsing, suffix matching, allow/deny precedence, error handling — v1.0
 - ✓ README with pitch, quick start, config docs, and "what this is / isn't" — v1.0
 
+- ✓ Package metadata ready for npm (conditional exports, types, files, engines, keywords) — v1.1
+- ✓ Type declarations resolve for all consumer moduleResolution modes (nodenext) — v1.1
+- ✓ publint + attw validation pipeline with prepublishOnly hook — v1.1
+- ✓ GitHub Actions CI with Node 18/20/22 test matrix — v1.1
+- ✓ CI runs build + publint + attw validation after tests pass — v1.1
+
 ### Active
 
-## Current Milestone: v1.1 Publish to npm
-
-**Goal:** Make the library installable via `npm install agent-dns-firewall` with CI/CD automated publishing.
-
-**Target features:**
-- Package metadata ready for npm (package.json fields, LICENSE, .npmignore)
-- Type declarations included in published package
-- GitHub Actions CI/CD pipeline for automated publish on release/tag
-- ESM-only distribution (no CJS build)
+(No active milestone — run `/gsd:new-milestone` to start next)
 
 ### Out of Scope
 
@@ -49,7 +47,7 @@ Before your agent calls `fetch()`, you can ask `isDomainBlocked(hostname)` and d
 
 ## Context
 
-- Shipped v1.0 with 1,308 LOC TypeScript, 111 tests passing
+- Shipped v1.1 (npm-ready) with 344 LOC TypeScript, 120 tests passing
 - Tech stack: TypeScript, Vitest, ESM-only, zero runtime dependencies
 - Target runtime: Node 18+, with Deno/Bun compatibility in mind
 - Blocklist sources use community-maintained lists (StevenBlack, Hagezi) in standard hosts/domains formats
@@ -76,6 +74,11 @@ Before your agent calls `fetch()`, you can ask `isDomainBlocked(hostname)` and d
 | Promise.allSettled for multi-source fetch | Isolates per-source failures, no single-source failure kills startup | ✓ Good |
 | Atomic swap for refresh | No vulnerability window during blocklist refresh | ✓ Good |
 | Optional log callback defaulting to console | Zero deps, fully controllable, silent when desired | ✓ Good |
+| nodenext moduleResolution over bundler | Correct type resolution for all consumer configs | ✓ Good |
+| types-first conditional exports | Ensures TypeScript resolves types before JS | ✓ Good |
+| attw --profile esm-only | ESM-only package, CJS warning is expected/ignorable | ✓ Good |
+| files whitelist over .npmignore | Whitelist is safer than denylist for tarball contents | ✓ Good |
+| actions/checkout@v4 + setup-node@v4 | Stable, widely deployed; v6 exists but v4 avoids edge cases | ✓ Good |
 
 ---
-*Last updated: 2026-03-09 after v1.1 milestone start*
+*Last updated: 2026-03-09 after v1.1 milestone complete*
