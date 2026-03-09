@@ -2,25 +2,20 @@ import type { BlocklistSource } from './types.js';
 import { parseHostsFormat, parseDomainList } from './parse.js';
 import { buildDomainIndex } from './match.js';
 
-interface CacheEntry {
+export interface CacheEntry {
   etag?: string;
   lastModified?: string;
   domains: string[];
 }
 
-const sourceCache = new Map<string, CacheEntry>();
-
-export function clearSourceCache(): void {
-  sourceCache.clear();
-}
-
 export async function fetchSource(
   source: BlocklistSource,
   signal: AbortSignal,
+  cache: Map<string, CacheEntry>,
 ): Promise<string[]> {
   const combinedSignal = AbortSignal.any([signal, AbortSignal.timeout(30_000)]);
 
-  const cached = sourceCache.get(source.url);
+  const cached = cache.get(source.url);
   const fetchOptions: RequestInit = { signal: combinedSignal };
 
   if (cached) {
@@ -57,7 +52,7 @@ export async function fetchSource(
   const lastModified = response.headers.get('last-modified') ?? undefined;
 
   if (etag || lastModified) {
-    sourceCache.set(source.url, { etag, lastModified, domains });
+    cache.set(source.url, { etag, lastModified, domains });
   }
 
   return domains;
@@ -67,9 +62,10 @@ export async function fetchAllSources(
   sources: BlocklistSource[],
   signal: AbortSignal,
   log: (level: 'warn' | 'error', message: string) => void,
+  cache: Map<string, CacheEntry>,
 ): Promise<Array<{ index: Set<string>; sourceId: string }>> {
   const results = await Promise.allSettled(
-    sources.map((source) => fetchSource(source, signal)),
+    sources.map((source) => fetchSource(source, signal, cache)),
   );
 
   const entries: Array<{ index: Set<string>; sourceId: string }> = [];
