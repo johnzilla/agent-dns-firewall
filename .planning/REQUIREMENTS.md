@@ -9,10 +9,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Parsing
 
-- [ ] **PARSE-01**: Library can parse hosts-format blocklists (lines like `0.0.0.0 domain.com` or `127.0.0.1 domain.com`), skipping comments, blank lines, and IP-only entries
-- [ ] **PARSE-02**: Library can parse domain-list-format blocklists (one domain per non-blank, non-comment line)
+- [x] **PARSE-01**: Library can parse hosts-format blocklists (lines like `0.0.0.0 domain.com` or `127.0.0.1 domain.com`), skipping comments, blank lines, and IP-only entries
+- [x] **PARSE-02**: Library can parse domain-list-format blocklists (one domain per non-blank, non-comment line)
 - [ ] **PARSE-03**: Library can fetch blocklists from HTTP(S) URLs using native fetch
-- [ ] **PARSE-04**: All hostnames are normalized: lowercased, trimmed, trailing dot stripped
+- [x] **PARSE-04**: All hostnames are normalized: lowercased, trimmed, trailing dot stripped
 
 ### Matching
 
@@ -89,10 +89,10 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PARSE-01 | Phase 1 | Pending |
-| PARSE-02 | Phase 1 | Pending |
+| PARSE-01 | Phase 1 | Complete |
+| PARSE-02 | Phase 1 | Complete |
 | PARSE-03 | Phase 2 | Pending |
-| PARSE-04 | Phase 1 | Pending |
+| PARSE-04 | Phase 1 | Complete |
 | MATCH-01 | Phase 1 | Pending |
 | MATCH-02 | Phase 1 | Pending |
 | MATCH-03 | Phase 1 | Pending |

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-stopped_at: Phase 1 context gathered
-last_updated: "2026-03-08T23:14:39.822Z"
+status: executing
+stopped_at: Completed 01-01-PLAN.md
+last_updated: "2026-03-09T00:11:46.513Z"
 last_activity: 2026-03-08 -- Roadmap created
 progress:
   total_phases: 3
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
   percent: 0
 ---
 
@@ -26,28 +26,28 @@ See: .planning/PROJECT.md (updated 2026-03-08)
 ## Current Position
 
 Phase: 1 of 3 (Core Logic)
-Plan: 0 of ? in current phase
-Status: Ready to plan
-Last activity: 2026-03-08 -- Roadmap created
+Plan: 1 of 2 in current phase
+Status: Executing
+Last activity: 2026-03-09 -- Completed 01-01 (project setup and parsing)
 
-Progress: [..........] 0%
+Progress: [#####.....] 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
-- Average duration: -
-- Total execution time: 0 hours
+- Total plans completed: 1
+- Average duration: 2min
+- Total execution time: 0.03 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 01-core-logic | 1 | 2min | 2min |
 
 **Recent Trend:**
-- Last 5 plans: -
-- Trend: -
+- Last 5 plans: 01-01 (2min)
+- Trend: starting
 
 *Updated after each plan completion*
 
@@ -60,6 +60,8 @@ Recent decisions affecting current work:
 
 - [Roadmap]: 3-phase coarse structure -- pure logic first, then I/O/lifecycle, then quality/docs
 - [Roadmap]: Set<string> with suffix walking for domain index (per research recommendation)
+- [01-01]: Used Set for SPECIAL_HOSTS filtering with 11 known special hostnames
+- [01-01]: IP pattern regex covers IPv4 and common IPv6 loopback variants
 
 ### Pending Todos
 
@@ -71,6 +73,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-08T23:14:39.820Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-core-logic/01-CONTEXT.md
+Last session: 2026-03-09T00:10:54Z
+Stopped at: Completed 01-01-PLAN.md
+Resume file: .planning/phases/01-core-logic/01-01-SUMMARY.md
