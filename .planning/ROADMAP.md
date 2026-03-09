@@ -44,7 +44,9 @@ Plans:
   1. Pushing a commit to any branch triggers a CI workflow that runs tests and reports pass/fail status
   2. CI test matrix covers Node 18, 20, and 22 -- a failure on any version is surfaced
   3. CI runs build, publint, and attw validation after tests pass -- a packaging regression fails the workflow
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 05-01-PLAN.md -- Create CI workflow and update README with badge and branch protection docs
 
 ## Progress
 
@@ -57,4 +59,4 @@ Phases execute in numeric order: 4 -> 5
 | 2. Lifecycle and Configuration | v1.0 | 2/2 | Complete | 2026-03-09 |
 | 3. Quality and Ship | v1.0 | 2/2 | Complete | 2026-03-09 |
 | 4. Package Configuration | 1/1 | Complete    | 2026-03-09 | - |
-| 5. CI/CD Pipeline | v1.1 | 0/? | Not started | - |
+| 5. CI/CD Pipeline | v1.1 | 0/1 | Not started | - |
