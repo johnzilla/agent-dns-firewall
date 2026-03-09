@@ -20,7 +20,7 @@
   },
   "scripts": {
     "build": "rm -rf dist && tsc",
-    "check": "npm run build && publint && attw --pack",
+    "check": "npm run build && publint && attw --pack --profile esm-only",
     "prepublishOnly": "npm run check",
     "test": "vitest run",
     "test:watch": "vitest"
