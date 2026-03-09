@@ -29,7 +29,15 @@ Before your agent calls `fetch()`, you can ask `isDomainBlocked(hostname)` and d
 
 ### Active
 
-(None — v1.0 shipped, next milestone TBD)
+## Current Milestone: v1.1 Publish to npm
+
+**Goal:** Make the library installable via `npm install agent-dns-firewall` with CI/CD automated publishing.
+
+**Target features:**
+- Package metadata ready for npm (package.json fields, LICENSE, .npmignore)
+- Type declarations included in published package
+- GitHub Actions CI/CD pipeline for automated publish on release/tag
+- ESM-only distribution (no CJS build)
 
 ### Out of Scope
 
@@ -37,7 +45,7 @@ Before your agent calls `fetch()`, you can ask `isDomainBlocked(hostname)` and d
 - Category tags (ads vs malware vs adult) — adds complexity without clear v1 value
 - Integration with Route 53 / Cloudflare / managed DNS firewalls — different problem space
 - Per-tenant multi-tenancy, metrics, dashboards — enterprise concerns, not v1
-- npm publish — GitHub-only for now
+- CJS build — ESM-only, decided in v1.1 scoping
 
 ## Context
 
@@ -70,4 +78,4 @@ Before your agent calls `fetch()`, you can ask `isDomainBlocked(hostname)` and d
 | Optional log callback defaulting to console | Zero deps, fully controllable, silent when desired | ✓ Good |
 
 ---
-*Last updated: 2026-03-08 after v1.0 milestone*
+*Last updated: 2026-03-09 after v1.1 milestone start*

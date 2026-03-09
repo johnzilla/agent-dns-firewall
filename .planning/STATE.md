@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: completed
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-03-09T03:01:33Z"
-last_activity: 2026-03-09 -- Completed quick-3 (refactor cache state into firewall instance)
+milestone: v1.1
+milestone_name: Publish to npm
+status: defining_requirements
+stopped_at: null
+last_updated: "2026-03-09T03:10:00Z"
+last_activity: 2026-03-09 -- Milestone v1.1 started
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-08)
 
 **Core value:** Before your agent calls fetch(), ask isDomainBlocked(hostname) and drop known-bad destinations -- no infrastructure required.
-**Current focus:** Phase 3: Quality and Ship
+**Current focus:** v1.1 Publish to npm
 
 ## Current Position
 
-Phase: 3 of 3 (Quality and Ship) -- COMPLETE
-Plan: 2 of 2 in current phase (all complete)
-Status: Phase 3 Complete
-Last activity: 2026-03-09 - Completed quick task 3: Refactor Cache State into Firewall Instance
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-09 — Milestone v1.1 started
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
