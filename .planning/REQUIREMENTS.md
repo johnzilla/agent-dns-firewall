@@ -11,7 +11,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **PARSE-01**: Library can parse hosts-format blocklists (lines like `0.0.0.0 domain.com` or `127.0.0.1 domain.com`), skipping comments, blank lines, and IP-only entries
 - [x] **PARSE-02**: Library can parse domain-list-format blocklists (one domain per non-blank, non-comment line)
-- [ ] **PARSE-03**: Library can fetch blocklists from HTTP(S) URLs using native fetch
+- [x] **PARSE-03**: Library can fetch blocklists from HTTP(S) URLs using native fetch
 - [x] **PARSE-04**: All hostnames are normalized: lowercased, trimmed, trailing dot stripped
 
 ### Matching
@@ -35,14 +35,14 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Resilience
 
-- [ ] **RESL-01**: If a source URL fails to fetch, the library logs a warning and continues with successfully loaded sources
+- [x] **RESL-01**: If a source URL fails to fetch, the library logs a warning and continues with successfully loaded sources
 - [x] **RESL-02**: `isDomainBlocked()` never throws — returns `{ blocked: false }` for malformed or unexpected input
 
 ### Configuration
 
-- [ ] **CONF-01**: `PRESET_STEVENBLACK_UNIFIED` preset provides the StevenBlack unified hosts URL pre-configured
-- [ ] **CONF-02**: `PRESET_HAGEZI_LIGHT` preset provides a Hagezi light/security list URL pre-configured
-- [ ] **CONF-03**: Users can combine multiple sources, custom allow/deny lists, and optional refresh interval via `FirewallConfig`
+- [x] **CONF-01**: `PRESET_STEVENBLACK_UNIFIED` preset provides the StevenBlack unified hosts URL pre-configured
+- [x] **CONF-02**: `PRESET_HAGEZI_LIGHT` preset provides a Hagezi light/security list URL pre-configured
+- [x] **CONF-03**: Users can combine multiple sources, custom allow/deny lists, and optional refresh interval via `FirewallConfig`
 
 ### Quality
 
@@ -91,7 +91,7 @@ Deferred to future release. Tracked but not in current roadmap.
 |-------------|-------|--------|
 | PARSE-01 | Phase 1 | Complete |
 | PARSE-02 | Phase 1 | Complete |
-| PARSE-03 | Phase 2 | Pending |
+| PARSE-03 | Phase 2 | Complete |
 | PARSE-04 | Phase 1 | Complete |
 | MATCH-01 | Phase 1 | Complete |
 | MATCH-02 | Phase 1 | Complete |
@@ -103,11 +103,11 @@ Deferred to future release. Tracked but not in current roadmap.
 | LIFE-02 | Phase 2 | Pending |
 | LIFE-03 | Phase 2 | Pending |
 | LIFE-04 | Phase 2 | Pending |
-| RESL-01 | Phase 2 | Pending |
+| RESL-01 | Phase 2 | Complete |
 | RESL-02 | Phase 1 | Complete |
-| CONF-01 | Phase 2 | Pending |
-| CONF-02 | Phase 2 | Pending |
-| CONF-03 | Phase 2 | Pending |
+| CONF-01 | Phase 2 | Complete |
+| CONF-02 | Phase 2 | Complete |
+| CONF-03 | Phase 2 | Complete |
 | QUAL-01 | Phase 3 | Pending |
 | QUAL-02 | Phase 3 | Pending |
 | QUAL-03 | Phase 3 | Pending |
