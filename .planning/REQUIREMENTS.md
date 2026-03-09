@@ -51,6 +51,34 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **QUAL-03**: Unit tests cover allow/deny precedence logic
 - [x] **QUAL-04**: README includes pitch, quick start example, config docs, and "what this is / isn't" section
 
+## v1.1 Requirements
+
+Requirements for npm publish milestone. Each maps to roadmap phases.
+
+### Package Metadata
+
+- [ ] **PKG-01**: package.json `exports` field uses conditional exports with `types` condition first
+- [ ] **PKG-02**: package.json has `types`, `files`, `engines`, `keywords`, `repository`, `homepage`, `bugs`, `author` fields
+- [ ] **PKG-03**: package.json version set to `1.0.0` for first npm publish
+- [ ] **PKG-04**: package.json has `sideEffects: false` for tree-shaking
+- [ ] **PKG-05**: LICENSE file exists in project root
+
+### Build
+
+- [ ] **BUILD-01**: tsconfig `moduleResolution` switched from `bundler` to `nodenext` (and `module` to `nodenext`)
+- [ ] **BUILD-02**: `prepublishOnly` script runs build + validation before publish
+
+### Validation
+
+- [ ] **VAL-01**: publint installed as dev dependency and validates package structure
+- [ ] **VAL-02**: @arethetypeswrong/cli installed as dev dependency and validates type resolution
+
+### CI/CD
+
+- [ ] **CI-01**: GitHub Actions CI workflow runs tests on push and PR
+- [ ] **CI-02**: CI tests across Node 18, 20, and 22
+- [ ] **CI-03**: CI runs build and validation (publint + attw) after tests
+
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
@@ -67,8 +95,11 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ### Lifecycle
 
-- **LIFE-05**: ETag/If-Modified-Since conditional refresh to avoid re-downloading unchanged lists
 - **LIFE-06**: Event callback `onBlocked(hostname, decision)` for logging/alerting
+
+### Publishing
+
+- **PUB-01**: Automated publish on git tag via OIDC trusted publishing with provenance badge
 
 ## Out of Scope
 
@@ -83,7 +114,10 @@ Deferred to future release. Tracked but not in current roadmap.
 | Per-tenant multi-tenancy | Enterprise concern; users can instantiate multiple firewalls |
 | System-level DNS interception | Invasive, requires root, violates "no infrastructure" promise |
 | Full adblock filter syntax | Enormous scope; domain extraction only if ever supported |
-| npm publish | GitHub-only for v1 |
+| CJS build | ESM-only; Node 18+ has full ESM support |
+| semantic-release / changesets | Overkill for single-maintainer library at this scale |
+| .npmignore | files whitelist is safer than denylist approach |
+| Bundling into single file | Library is small; individual modules allow tree-shaking |
 
 ## Traceability
 
@@ -120,4 +154,4 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ---
 *Requirements defined: 2026-03-08*
-*Last updated: 2026-03-08 after roadmap creation*
+*Last updated: 2026-03-09 after v1.1 milestone requirements*
