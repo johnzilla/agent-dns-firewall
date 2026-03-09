@@ -1,19 +1,55 @@
 {
   "name": "agent-dns-firewall",
-  "version": "0.1.0",
-  "type": "module",
+  "version": "1.0.0",
   "description": "Before your agent calls fetch(), ask isDomainBlocked(hostname) and drop known-bad destinations",
+  "type": "module",
   "exports": {
-    ".": "./dist/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf dist && tsc",
+    "check": "npm run build && publint && attw --pack",
+    "prepublishOnly": "npm run check",
     "test": "vitest run",
     "test:watch": "vitest"
   },
+  "keywords": [
+    "dns",
+    "firewall",
+    "blocklist",
+    "security",
+    "ai-agent",
+    "agent",
+    "domain-blocking",
+    "allowlist",
+    "denylist"
+  ],
+  "author": "johnzilla",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/johnzilla/agent-dns-firewall.git"
+  },
+  "homepage": "https://github.com/johnzilla/agent-dns-firewall#readme",
+  "bugs": {
+    "url": "https://github.com/johnzilla/agent-dns-firewall/issues"
+  },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.2",
     "@vitest/coverage-v8": "^4.0.18",
+    "publint": "^0.3.18",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   }
