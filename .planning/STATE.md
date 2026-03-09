@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 Phase: 5 of 5 (CI/CD Pipeline)
 Plan: 1 of 1 in current phase (complete)
 Status: Milestone v1.1 complete
-Last activity: 2026-03-09 -- Completed 05-01 CI/CD pipeline
+Last activity: 2026-03-09 - Completed quick task 4: Add npm publish workflow
 
 Progress: [██████████] 100%
 
@@ -85,6 +85,7 @@ None yet.
 | 1 | Refine the Public API Surface | 2026-03-09 | 69d11f8 | [1-refine-the-public-api-surface](./quick/1-refine-the-public-api-surface/) |
 | 2 | Efficient Blocklist Fetching | 2026-03-09 | 98018f6 | [2-implement-efficient-blocklist-fetching-w](./quick/2-implement-efficient-blocklist-fetching-w/) |
 | 3 | Refactor Cache State into Firewall Instance | 2026-03-09 | 2a7a6f3 | [3-refactor-cache-state-into-firewall-insta](./quick/3-refactor-cache-state-into-firewall-insta/) |
+| 4 | Add npm publish workflow | 2026-03-09 | faac871 | [4-add-trusted-publishing-for-npm-moving-pu](./quick/4-add-trusted-publishing-for-npm-moving-pu/) |
 
 ## Session Continuity
 
