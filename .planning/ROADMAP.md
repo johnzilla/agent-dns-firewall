@@ -32,7 +32,9 @@
   2. A consumer project using `moduleResolution: "nodenext"` can import the package and TypeScript resolves all types without errors
   3. `npx publint` and `npx attw --pack` both pass with no errors
   4. Running `npm publish --dry-run` triggers the prepublishOnly script which builds and validates before proceeding
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 04-01-PLAN.md -- Configure package.json, tsconfig.json, install validation tooling, and verify full check pipeline
 
 ### Phase 5: CI/CD Pipeline
 **Goal**: Every push and PR is automatically tested across Node 18/20/22 and validated for package correctness
@@ -54,5 +56,5 @@ Phases execute in numeric order: 4 -> 5
 | 1. Core Logic | v1.0 | 2/2 | Complete | 2026-03-09 |
 | 2. Lifecycle and Configuration | v1.0 | 2/2 | Complete | 2026-03-09 |
 | 3. Quality and Ship | v1.0 | 2/2 | Complete | 2026-03-09 |
-| 4. Package Configuration | v1.1 | 0/? | Not started | - |
+| 4. Package Configuration | v1.1 | 0/1 | Not started | - |
 | 5. CI/CD Pipeline | v1.1 | 0/? | Not started | - |
