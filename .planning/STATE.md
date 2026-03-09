@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: completed
 stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-03-09T02:46:36Z"
-last_activity: 2026-03-09 -- Completed quick-2 (efficient blocklist fetching with conditional HTTP)
+last_updated: "2026-03-09T03:01:33Z"
+last_activity: 2026-03-09 -- Completed quick-3 (refactor cache state into firewall instance)
 progress:
   total_phases: 3
   completed_phases: 3
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-03-08)
 Phase: 3 of 3 (Quality and Ship) -- COMPLETE
 Plan: 2 of 2 in current phase (all complete)
 Status: Phase 3 Complete
-Last activity: 2026-03-09 - Completed quick task 2: Efficient Blocklist Fetching
+Last activity: 2026-03-09 - Completed quick task 3: Refactor Cache State into Firewall Instance
 
 Progress: [██████████] 100%
 
@@ -77,6 +77,7 @@ Recent decisions affecting current work:
 - [Phase 03]: Edge case tests added as new describe blocks in existing files with QUAL-XX labels
 - [Quick-1]: Removed internal helper re-exports from index.ts, keeping only public API surface
 - [Quick-2]: Module-level Map cache keyed by source URL for ETag/Last-Modified conditional fetching
+- [Quick-3]: Cache Map passed as parameter to fetch functions; per-instance cache created inside createDomainFirewall closure
 
 ### Pending Todos
 
@@ -92,9 +93,10 @@ None yet.
 |---|-------------|------|--------|-----------|
 | 1 | Refine the Public API Surface | 2026-03-09 | 69d11f8 | [1-refine-the-public-api-surface](./quick/1-refine-the-public-api-surface/) |
 | 2 | Efficient Blocklist Fetching | 2026-03-09 | 98018f6 | [2-implement-efficient-blocklist-fetching-w](./quick/2-implement-efficient-blocklist-fetching-w/) |
+| 3 | Refactor Cache State into Firewall Instance | 2026-03-09 | 2a7a6f3 | [3-refactor-cache-state-into-firewall-insta](./quick/3-refactor-cache-state-into-firewall-insta/) |
 
 ## Session Continuity
 
-Last session: 2026-03-09T02:46:36Z
-Stopped at: Completed quick-2-PLAN.md
+Last session: 2026-03-09T03:01:33Z
+Stopped at: Completed quick-3-PLAN.md
 Resume file: None
