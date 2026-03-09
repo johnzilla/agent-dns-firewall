@@ -234,4 +234,43 @@ describe('isDomainBlocked', () => {
       expect(result.listId).toBe('list-b');
     });
   });
+
+  describe('Precedence combinations (QUAL-03)', () => {
+    it('allow + blocklist (no deny): allowed domain is not blocked', () => {
+      const ctx = makeContext({
+        allow: ['safe.com'],
+        blocklists: [{ id: 'bl', domains: ['safe.com'] }],
+      });
+      expect(check('safe.com', ctx)).toEqual({ blocked: false });
+    });
+
+    it('allow is exact match only: subdomain of allowed domain in blocklist is still blocked', () => {
+      const ctx = makeContext({
+        allow: ['safe.com'],
+        blocklists: [{ id: 'bl', domains: ['safe.com'] }],
+      });
+      const result = check('ads.safe.com', ctx);
+      expect(result).toEqual({ blocked: true, reason: 'blocklist', listId: 'bl' });
+    });
+
+    it('deny + blocklist same domain: reason is custom-deny not blocklist', () => {
+      const ctx = makeContext({
+        deny: ['bad.com'],
+        blocklists: [{ id: 'bl', domains: ['bad.com'] }],
+      });
+      const result = check('bad.com', ctx);
+      expect(result).toEqual({ blocked: true, reason: 'custom-deny' });
+    });
+
+    it('domain in second of two blocklists gets second list sourceId', () => {
+      const ctx = makeContext({
+        blocklists: [
+          { id: 'first-list', domains: ['other.com'] },
+          { id: 'second-list', domains: ['target.com'] },
+        ],
+      });
+      const result = check('target.com', ctx);
+      expect(result).toEqual({ blocked: true, reason: 'blocklist', listId: 'second-list' });
+    });
+  });
 });

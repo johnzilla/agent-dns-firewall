@@ -60,3 +60,15 @@ describe('isDomainInIndex', () => {
     expect(isDomainInIndex('example.com', index)).toBe(false);
   });
 });
+
+describe('isDomainInIndex edge cases (QUAL-02)', () => {
+  it('single-label domain in index matches subdomains via suffix walk', () => {
+    const index = buildDomainIndex(['com']);
+    expect(isDomainInIndex('anything.com', index)).toBe(true);
+  });
+
+  it('partial label overlap does NOT match (ware.test vs malware.test)', () => {
+    const index = buildDomainIndex(['ware.test']);
+    expect(isDomainInIndex('malware.test', index)).toBe(false);
+  });
+});
