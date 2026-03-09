@@ -16,15 +16,15 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Matching
 
-- [ ] **MATCH-01**: Exact domain match — `malware.test` in blocklist blocks `malware.test`
-- [ ] **MATCH-02**: Suffix/subdomain match — `malware.test` in blocklist blocks `sub.malware.test` (label-boundary aware, does NOT block `notmalware.test`)
-- [ ] **MATCH-03**: `isDomainBlocked(hostname)` returns a `BlockDecision` object with `blocked`, `reason`, and `listId` fields
+- [x] **MATCH-01**: Exact domain match — `malware.test` in blocklist blocks `malware.test`
+- [x] **MATCH-02**: Suffix/subdomain match — `malware.test` in blocklist blocks `sub.malware.test` (label-boundary aware, does NOT block `notmalware.test`)
+- [x] **MATCH-03**: `isDomainBlocked(hostname)` returns a `BlockDecision` object with `blocked`, `reason`, and `listId` fields
 
 ### Overrides
 
-- [ ] **OVER-01**: Domains in the `allow` list are never blocked, regardless of blocklist or deny list
-- [ ] **OVER-02**: Domains in the `deny` list are always blocked (after allow check)
-- [ ] **OVER-03**: Precedence order is: allow > deny > blocklist > not-blocked
+- [x] **OVER-01**: Domains in the `allow` list are never blocked, regardless of blocklist or deny list
+- [x] **OVER-02**: Domains in the `deny` list are always blocked (after allow check)
+- [x] **OVER-03**: Precedence order is: allow > deny > blocklist > not-blocked
 
 ### Lifecycle
 
@@ -36,7 +36,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Resilience
 
 - [ ] **RESL-01**: If a source URL fails to fetch, the library logs a warning and continues with successfully loaded sources
-- [ ] **RESL-02**: `isDomainBlocked()` never throws — returns `{ blocked: false }` for malformed or unexpected input
+- [x] **RESL-02**: `isDomainBlocked()` never throws — returns `{ blocked: false }` for malformed or unexpected input
 
 ### Configuration
 
@@ -93,18 +93,18 @@ Deferred to future release. Tracked but not in current roadmap.
 | PARSE-02 | Phase 1 | Complete |
 | PARSE-03 | Phase 2 | Pending |
 | PARSE-04 | Phase 1 | Complete |
-| MATCH-01 | Phase 1 | Pending |
-| MATCH-02 | Phase 1 | Pending |
-| MATCH-03 | Phase 1 | Pending |
-| OVER-01 | Phase 1 | Pending |
-| OVER-02 | Phase 1 | Pending |
-| OVER-03 | Phase 1 | Pending |
+| MATCH-01 | Phase 1 | Complete |
+| MATCH-02 | Phase 1 | Complete |
+| MATCH-03 | Phase 1 | Complete |
+| OVER-01 | Phase 1 | Complete |
+| OVER-02 | Phase 1 | Complete |
+| OVER-03 | Phase 1 | Complete |
 | LIFE-01 | Phase 2 | Pending |
 | LIFE-02 | Phase 2 | Pending |
 | LIFE-03 | Phase 2 | Pending |
 | LIFE-04 | Phase 2 | Pending |
 | RESL-01 | Phase 2 | Pending |
-| RESL-02 | Phase 1 | Pending |
+| RESL-02 | Phase 1 | Complete |
 | CONF-01 | Phase 2 | Pending |
 | CONF-02 | Phase 2 | Pending |
 | CONF-03 | Phase 2 | Pending |
