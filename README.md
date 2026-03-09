@@ -112,6 +112,12 @@ Returned by `isDomainBlocked()`:
 | `reason` | `'custom-deny' \| 'blocklist' \| undefined` | Why it was blocked. `undefined` when `blocked` is `false` |
 | `listId` | `string \| undefined` | The `BlocklistSource.id` that matched. Set only when `reason` is `'blocklist'` |
 
+## Efficient Fetching
+
+Blocklist fetches use conditional HTTP headers (`ETag` and `If-Modified-Since`) automatically. On the first fetch the library stores cache validators from the server response. Subsequent refreshes send these headers back -- if the server returns `304 Not Modified`, the cached domains are reused without re-downloading the list. This reduces bandwidth for both your application and blocklist providers.
+
+No configuration is needed; this behavior is built into every `start()` and refresh cycle.
+
 ## License
 
 MIT
