@@ -19,7 +19,7 @@
 ### v1.1 Publish to npm
 
 - [x] **Phase 4: Package Configuration** - Package metadata, tsconfig fix, validation tooling, and build script so the library produces a correct npm-publishable artifact (completed 2026-03-09)
-- [ ] **Phase 5: CI/CD Pipeline** - GitHub Actions workflows for automated testing across Node versions and build validation on every push/PR
+- [x] **Phase 5: CI/CD Pipeline** - GitHub Actions workflows for automated testing across Node versions and build validation on every push/PR (completed 2026-03-09)
 
 ## Phase Details
 
@@ -44,7 +44,7 @@ Plans:
   1. Pushing a commit to any branch triggers a CI workflow that runs tests and reports pass/fail status
   2. CI test matrix covers Node 18, 20, and 22 -- a failure on any version is surfaced
   3. CI runs build, publint, and attw validation after tests pass -- a packaging regression fails the workflow
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
 - [ ] 05-01-PLAN.md -- Create CI workflow and update README with badge and branch protection docs
 
@@ -59,4 +59,4 @@ Phases execute in numeric order: 4 -> 5
 | 2. Lifecycle and Configuration | v1.0 | 2/2 | Complete | 2026-03-09 |
 | 3. Quality and Ship | v1.0 | 2/2 | Complete | 2026-03-09 |
 | 4. Package Configuration | 1/1 | Complete    | 2026-03-09 | - |
-| 5. CI/CD Pipeline | v1.1 | 0/1 | Not started | - |
+| 5. CI/CD Pipeline | v1.1 | Complete    | 2026-03-09 | - |
