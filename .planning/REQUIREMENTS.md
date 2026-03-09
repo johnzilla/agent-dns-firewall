@@ -46,10 +46,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Quality
 
-- [ ] **QUAL-01**: Unit tests cover hosts-format and domain-list parsing (including edge cases: inline comments, mixed IPs, blank lines)
-- [ ] **QUAL-02**: Unit tests cover suffix matching (exact match, subdomain match, label-boundary correctness)
-- [ ] **QUAL-03**: Unit tests cover allow/deny precedence logic
-- [ ] **QUAL-04**: README includes pitch, quick start example, config docs, and "what this is / isn't" section
+- [x] **QUAL-01**: Unit tests cover hosts-format and domain-list parsing (including edge cases: inline comments, mixed IPs, blank lines)
+- [x] **QUAL-02**: Unit tests cover suffix matching (exact match, subdomain match, label-boundary correctness)
+- [x] **QUAL-03**: Unit tests cover allow/deny precedence logic
+- [x] **QUAL-04**: README includes pitch, quick start example, config docs, and "what this is / isn't" section
 
 ## v2 Requirements
 
@@ -108,10 +108,10 @@ Deferred to future release. Tracked but not in current roadmap.
 | CONF-01 | Phase 2 | Complete |
 | CONF-02 | Phase 2 | Complete |
 | CONF-03 | Phase 2 | Complete |
-| QUAL-01 | Phase 3 | Pending |
-| QUAL-02 | Phase 3 | Pending |
-| QUAL-03 | Phase 3 | Pending |
-| QUAL-04 | Phase 3 | Pending |
+| QUAL-01 | Phase 3 | Complete |
+| QUAL-02 | Phase 3 | Complete |
+| QUAL-03 | Phase 3 | Complete |
+| QUAL-04 | Phase 3 | Complete |
 
 **Coverage:**
 - v1 requirements: 23 total
