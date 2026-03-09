@@ -1,5 +1,7 @@
 # agent-dns-firewall
 
+[![CI](https://github.com/johnzilla/agent-dns-firewall/actions/workflows/ci.yml/badge.svg)](https://github.com/johnzilla/agent-dns-firewall/actions/workflows/ci.yml)
+
 Before your agent calls `fetch()`, ask `isDomainBlocked(hostname)` and drop known-bad destinations -- no infrastructure required.
 
 An in-process domain firewall for AI agents. It downloads public blocklists, builds a fast lookup index, and exposes a single synchronous check. Zero runtime dependencies; works with any HTTP client or framework.
@@ -119,6 +121,16 @@ Blocklist fetches use conditional HTTP headers (`ETag` and `If-Modified-Since`) 
 Each firewall instance maintains its own cache -- multiple instances never share or interfere with each other's cached data. When an instance is stopped, its cache is released automatically.
 
 No configuration is needed; this behavior is built into every `start()` and refresh cycle.
+
+## Branch Protection (Recommended)
+
+To require CI to pass before merging to main:
+
+1. Go to **Settings > Branches > Add branch protection rule**
+2. Branch name pattern: `main`
+3. Check **Require status checks to pass before merging**
+4. Search and select: `test (18)`, `test (20)`, `test (22)`, `validate`
+5. Optionally check **Require branches to be up to date before merging**
 
 ## License
 
