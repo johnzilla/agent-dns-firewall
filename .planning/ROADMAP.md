@@ -59,10 +59,11 @@ Plans:
   2. Unit tests verify suffix matching correctness (exact match, subdomain match, label-boundary -- no false positives)
   3. Unit tests verify allow/deny precedence logic for all combinations
   4. README contains a pitch, working quick-start example, config reference, and "what this is / isn't" section
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 03-01: TBD
+- [ ] 03-01-PLAN.md — Edge case tests for parsing, matching, and precedence (QUAL-01, QUAL-02, QUAL-03)
+- [ ] 03-02-PLAN.md — Complete README with pitch, quick start, config reference, and scope boundaries (QUAL-04)
 
 ## Progress
 
@@ -73,4 +74,4 @@ Phases execute in numeric order: 1 -> 2 -> 3
 |-------|----------------|--------|-----------|
 | 1. Core Logic | 2/2 | Complete   | 2026-03-09 |
 | 2. Lifecycle and Configuration | 2/2 | Complete   | 2026-03-09 |
-| 3. Quality and Ship | 0/? | Not started | - |
+| 3. Quality and Ship | 0/2 | Not started | - |
