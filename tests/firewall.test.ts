@@ -135,13 +135,13 @@ describe('createDomainFirewall', () => {
 
     it('stop() aborts in-flight fetch', async () => {
       // Make fetch hang until aborted
-      let abortSignalAborted = false;
+      let capturedSignal: AbortSignal | null = null;
       vi.stubGlobal(
         'fetch',
         vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+          capturedSignal = init.signal ?? null;
           return new Promise((_resolve, reject) => {
             init.signal?.addEventListener('abort', () => {
-              abortSignalAborted = true;
               reject(new DOMException('The operation was aborted.', 'AbortError'));
             });
           });
@@ -150,11 +150,16 @@ describe('createDomainFirewall', () => {
 
       const fw = createDomainFirewall(baseConfig);
       const startPromise = fw.start();
+
+      // Wait a microtask so fetch is called
+      await vi.advanceTimersByTimeAsync(0);
+      expect(capturedSignal).not.toBeNull();
+
       fw.stop();
 
-      // The start promise should reject or resolve (abort causes rejection)
-      await expect(startPromise).rejects.toThrow();
-      expect(abortSignalAborted).toBe(true);
+      // start() resolves (fetchAllSources handles abort via allSettled)
+      await startPromise;
+      expect(capturedSignal!.aborted).toBe(true);
     });
   });
 
