@@ -44,11 +44,11 @@ Plans:
   3. If a source URL fails to fetch, the firewall logs a warning and continues operating with successfully loaded sources
   4. After `stop()`, refresh timers are cleared and no background work continues
   5. When `refreshMinutes` is configured, the firewall periodically re-fetches sources without creating a vulnerability window during refresh
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [ ] 02-01-PLAN.md — Types update, preset constants, and HTTP fetch module with error isolation
+- [ ] 02-02-PLAN.md — Factory function with lifecycle management and public API exports
 
 ### Phase 3: Quality and Ship
 **Goal**: The library has comprehensive test coverage and documentation sufficient for a developer to adopt it from the README alone
@@ -72,5 +72,5 @@ Phases execute in numeric order: 1 -> 2 -> 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Core Logic | 2/2 | Complete   | 2026-03-09 |
-| 2. Lifecycle and Configuration | 0/? | Not started | - |
+| 2. Lifecycle and Configuration | 0/2 | Not started | - |
 | 3. Quality and Ship | 0/? | Not started | - |
