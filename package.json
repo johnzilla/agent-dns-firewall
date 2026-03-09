@@ -1,6 +1,6 @@
 {
   "name": "agent-dns-firewall",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Before your agent calls fetch(), ask isDomainBlocked(hostname) and drop known-bad destinations",
   "type": "module",
   "exports": {
