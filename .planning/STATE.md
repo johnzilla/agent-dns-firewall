@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: completed
 stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-03-09T02:28:21.351Z"
-last_activity: 2026-03-09 -- Completed 03-02 (README documentation)
+last_updated: "2026-03-09T02:38:24Z"
+last_activity: 2026-03-09 -- Completed quick-1 (refine public API surface)
 progress:
   total_phases: 3
   completed_phases: 3
@@ -75,6 +75,7 @@ Recent decisions affecting current work:
 - [Phase 02]: fetchAllSources handles abort gracefully via Promise.allSettled
 - [Phase 03]: Concise technical tone with two-column scope table for README
 - [Phase 03]: Edge case tests added as new describe blocks in existing files with QUAL-XX labels
+- [Quick-1]: Removed internal helper re-exports from index.ts, keeping only public API surface
 
 ### Pending Todos
 
@@ -86,6 +87,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-09T02:16:43.564Z
-Stopped at: Completed 03-02-PLAN.md
+Last session: 2026-03-09T02:38:24Z
+Stopped at: Completed quick-1-PLAN.md
 Resume file: None
