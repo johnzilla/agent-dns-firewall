@@ -2,12 +2,12 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Publish to npm
-status: defining_requirements
+status: ready_to_plan
 stopped_at: null
-last_updated: "2026-03-09T03:10:00Z"
-last_activity: 2026-03-09 -- Milestone v1.1 started
+last_updated: "2026-03-08T00:00:00Z"
+last_activity: 2026-03-08 -- Roadmap created for v1.1
 progress:
-  total_phases: 0
+  total_phases: 2
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -18,17 +18,17 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-08)
+See: .planning/PROJECT.md (updated 2026-03-09)
 
 **Core value:** Before your agent calls fetch(), ask isDomainBlocked(hostname) and drop known-bad destinations -- no infrastructure required.
-**Current focus:** v1.1 Publish to npm
+**Current focus:** Phase 4 - Package Configuration
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-09 — Milestone v1.1 started
+Phase: 4 of 5 (Package Configuration)
+Plan: 0 of ? in current phase
+Status: Ready to plan
+Last activity: 2026-03-08 -- Roadmap created for v1.1
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -45,7 +45,6 @@ Progress: [░░░░░░░░░░] 0%
 |-------|-------|-------|----------|
 | 01-core-logic | 2 | 4min | 2min |
 | 02-lifecycle-and-configuration | 2 | 4min | 2min |
-
 | 03-quality-and-ship | 2 | 2min | 1min |
 
 **Recent Trend:**
@@ -61,23 +60,10 @@ Progress: [░░░░░░░░░░] 0%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- [Roadmap]: 3-phase coarse structure -- pure logic first, then I/O/lifecycle, then quality/docs
-- [Roadmap]: Set<string> with suffix walking for domain index (per research recommendation)
-- [01-01]: Used Set for SPECIAL_HOSTS filtering with 11 known special hostnames
-- [01-01]: IP pattern regex covers IPv4 and common IPv6 loopback variants
-- [01-02]: Set<string> domain index with suffix walking at label boundaries
-- [01-02]: Allow/deny use exact match only; blocklist uses suffix walking
-- [01-02]: isDomainBlocked wraps in try/catch, never throws
-- [02-01]: AbortSignal.any combines caller signal with 30s timeout for fetch calls
-- [02-01]: Promise.allSettled ensures individual source failures never block other sources
-- [Phase 02]: Closure-based factory over class for createDomainFirewall
-- [Phase 02]: Refresh only swaps blocklist when at least one source succeeds (stale > none)
-- [Phase 02]: fetchAllSources handles abort gracefully via Promise.allSettled
-- [Phase 03]: Concise technical tone with two-column scope table for README
-- [Phase 03]: Edge case tests added as new describe blocks in existing files with QUAL-XX labels
-- [Quick-1]: Removed internal helper re-exports from index.ts, keeping only public API surface
-- [Quick-2]: Module-level Map cache keyed by source URL for ETag/Last-Modified conditional fetching
-- [Quick-3]: Cache Map passed as parameter to fetch functions; per-instance cache created inside createDomainFirewall closure
+- [v1.0]: ESM-only, no CJS build
+- [v1.0]: Zero runtime dependencies
+- [v1.1-roadmap]: 2-phase coarse structure -- package config first, then CI/CD
+- [v1.1-roadmap]: PUB-01 (OIDC trusted publishing) deferred to v2, not in v1.1 scope
 
 ### Pending Todos
 
@@ -97,6 +83,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-09T03:01:33Z
-Stopped at: Completed quick-3-PLAN.md
+Last session: 2026-03-08
+Stopped at: Roadmap created for v1.1 milestone
 Resume file: None

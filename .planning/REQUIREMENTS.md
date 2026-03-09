@@ -1,7 +1,7 @@
 # Requirements: agent-dns-firewall
 
 **Defined:** 2026-03-08
-**Core Value:** Before your agent calls fetch(), you can ask isDomainBlocked(hostname) and drop known-bad destinations without touching the network — no infrastructure required.
+**Core Value:** Before your agent calls fetch(), you can ask isDomainBlocked(hostname) and drop known-bad destinations without touching the network -- no infrastructure required.
 
 ## v1 Requirements
 
@@ -16,8 +16,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Matching
 
-- [x] **MATCH-01**: Exact domain match — `malware.test` in blocklist blocks `malware.test`
-- [x] **MATCH-02**: Suffix/subdomain match — `malware.test` in blocklist blocks `sub.malware.test` (label-boundary aware, does NOT block `notmalware.test`)
+- [x] **MATCH-01**: Exact domain match -- `malware.test` in blocklist blocks `malware.test`
+- [x] **MATCH-02**: Suffix/subdomain match -- `malware.test` in blocklist blocks `sub.malware.test` (label-boundary aware, does NOT block `notmalware.test`)
 - [x] **MATCH-03**: `isDomainBlocked(hostname)` returns a `BlockDecision` object with `blocked`, `reason`, and `listId` fields
 
 ### Overrides
@@ -36,7 +36,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Resilience
 
 - [x] **RESL-01**: If a source URL fails to fetch, the library logs a warning and continues with successfully loaded sources
-- [x] **RESL-02**: `isDomainBlocked()` never throws — returns `{ blocked: false }` for malformed or unexpected input
+- [x] **RESL-02**: `isDomainBlocked()` never throws -- returns `{ blocked: false }` for malformed or unexpected input
 
 ### Configuration
 
@@ -121,6 +121,8 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ## Traceability
 
+### v1.0
+
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | PARSE-01 | Phase 1 | Complete |
@@ -147,11 +149,27 @@ Deferred to future release. Tracked but not in current roadmap.
 | QUAL-03 | Phase 3 | Complete |
 | QUAL-04 | Phase 3 | Complete |
 
+### v1.1
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| PKG-01 | Phase 4 | Pending |
+| PKG-02 | Phase 4 | Pending |
+| PKG-03 | Phase 4 | Pending |
+| PKG-04 | Phase 4 | Pending |
+| PKG-05 | Phase 4 | Pending |
+| BUILD-01 | Phase 4 | Pending |
+| BUILD-02 | Phase 4 | Pending |
+| VAL-01 | Phase 4 | Pending |
+| VAL-02 | Phase 4 | Pending |
+| CI-01 | Phase 5 | Pending |
+| CI-02 | Phase 5 | Pending |
+| CI-03 | Phase 5 | Pending |
+
 **Coverage:**
-- v1 requirements: 23 total
-- Mapped to phases: 23
-- Unmapped: 0
+- v1.0 requirements: 23 mapped, 0 unmapped
+- v1.1 requirements: 12 mapped, 0 unmapped
 
 ---
 *Requirements defined: 2026-03-08*
-*Last updated: 2026-03-09 after v1.1 milestone requirements*
+*Last updated: 2026-03-08 after v1.1 roadmap creation*
