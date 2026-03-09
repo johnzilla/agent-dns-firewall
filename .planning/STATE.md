@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Publish to npm
 status: completed
-stopped_at: Phase 5 context gathered
-last_updated: "2026-03-09T15:58:54.780Z"
-last_activity: 2026-03-09 -- Completed 04-01 package configuration
+stopped_at: Milestone v1.1 complete
+last_updated: "2026-03-09T18:40:00Z"
+last_activity: 2026-03-09 -- Completed 05-01 CI/CD pipeline
 progress:
   total_phases: 2
-  completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
+  completed_phases: 2
+  total_plans: 2
+  completed_plans: 2
   percent: 50
 ---
 
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-09)
 
 **Core value:** Before your agent calls fetch(), ask isDomainBlocked(hostname) and drop known-bad destinations -- no infrastructure required.
-**Current focus:** Phase 4 - Package Configuration
+**Current focus:** Phase 5 - CI/CD Pipeline
 
 ## Current Position
 
-Phase: 4 of 5 (Package Configuration)
+Phase: 5 of 5 (CI/CD Pipeline)
 Plan: 1 of 1 in current phase (complete)
-Status: Phase 4 complete
-Last activity: 2026-03-09 -- Completed 04-01 package configuration
+Status: Milestone v1.1 complete
+Last activity: 2026-03-09 -- Completed 05-01 CI/CD pipeline
 
-Progress: [█████░░░░░] 50%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
+- Total plans completed: 8
 - Average duration: 2min
-- Total execution time: 0.15 hours
+- Total execution time: 0.17 hours
 
 **By Phase:**
 
@@ -48,9 +48,10 @@ Progress: [█████░░░░░] 50%
 | 03-quality-and-ship | 2 | 2min | 1min |
 
 | 04-package-configuration | 1 | 1min | 1min |
+| 05-ci-cd-pipeline | 1 | 1min | 1min |
 
 **Recent Trend:**
-- Last 5 plans: 02-01 (2min), 02-02 (2min), 03-01 (1min), 03-02 (1min), 04-01 (1min)
+- Last 5 plans: 02-02 (2min), 03-01 (1min), 03-02 (1min), 04-01 (1min), 05-01 (1min)
 - Trend: consistent
 
 *Updated after each plan completion*
@@ -67,6 +68,7 @@ Recent decisions affecting current work:
 - [v1.1-roadmap]: 2-phase coarse structure -- package config first, then CI/CD
 - [v1.1-roadmap]: PUB-01 (OIDC trusted publishing) deferred to v2, not in v1.1 scope
 - [Phase 04-package-configuration]: Use --profile esm-only for attw (CJS warning expected for ESM-only pkg)
+- [Phase 05-ci-cd-pipeline]: actions v4 (stable) over v6; permissions: contents: read for least privilege
 
 ### Pending Todos
 
@@ -86,6 +88,5 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-09T15:58:54.777Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-ci-cd-pipeline/05-CONTEXT.md
+Last session: 2026-03-09T18:40:00Z
+Stopped at: Milestone v1.1 complete -- all phases executed

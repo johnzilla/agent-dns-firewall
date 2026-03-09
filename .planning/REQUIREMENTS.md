@@ -75,9 +75,9 @@ Requirements for npm publish milestone. Each maps to roadmap phases.
 
 ### CI/CD
 
-- [ ] **CI-01**: GitHub Actions CI workflow runs tests on push and PR
-- [ ] **CI-02**: CI tests across Node 18, 20, and 22
-- [ ] **CI-03**: CI runs build and validation (publint + attw) after tests
+- [x] **CI-01**: GitHub Actions CI workflow runs tests on push and PR
+- [x] **CI-02**: CI tests across Node 18, 20, and 22
+- [x] **CI-03**: CI runs build and validation (publint + attw) after tests
 
 ## v2 Requirements
 
@@ -162,9 +162,9 @@ Deferred to future release. Tracked but not in current roadmap.
 | BUILD-02 | Phase 4 | Complete |
 | VAL-01 | Phase 4 | Complete |
 | VAL-02 | Phase 4 | Complete |
-| CI-01 | Phase 5 | Pending |
-| CI-02 | Phase 5 | Pending |
-| CI-03 | Phase 5 | Pending |
+| CI-01 | Phase 5 | Complete |
+| CI-02 | Phase 5 | Complete |
+| CI-03 | Phase 5 | Complete |
 
 **Coverage:**
 - v1.0 requirements: 23 mapped, 0 unmapped
