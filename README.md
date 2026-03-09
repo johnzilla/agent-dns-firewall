@@ -100,7 +100,7 @@ Creates a firewall instance. Does not fetch blocklists until `start()` is called
 |---|---|---|
 | `start()` | `() => Promise<void>` | Fetches all configured blocklist sources and builds the domain index. Schedules auto-refresh if `refreshMinutes` is set. Idempotent -- calling `start()` again resets state and re-fetches. |
 | `stop()` | `() => void` | Aborts any in-flight fetches, clears refresh timers, and releases resources. |
-| `isDomainBlocked(domain)` | `(domain: string) => BlockDecision` | Synchronous lookup. Checks deny list, then allow list, then blocklists (with subdomain matching). Never throws. |
+| `isDomainBlocked(domain)` | `(domain: string) => BlockDecision` | Synchronous lookup. Checks allow list, then deny list, then blocklists (with subdomain matching). Never throws. |
 
 ### `BlockDecision`
 
