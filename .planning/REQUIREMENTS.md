@@ -57,21 +57,21 @@ Requirements for npm publish milestone. Each maps to roadmap phases.
 
 ### Package Metadata
 
-- [ ] **PKG-01**: package.json `exports` field uses conditional exports with `types` condition first
-- [ ] **PKG-02**: package.json has `types`, `files`, `engines`, `keywords`, `repository`, `homepage`, `bugs`, `author` fields
-- [ ] **PKG-03**: package.json version set to `1.0.0` for first npm publish
-- [ ] **PKG-04**: package.json has `sideEffects: false` for tree-shaking
-- [ ] **PKG-05**: LICENSE file exists in project root
+- [x] **PKG-01**: package.json `exports` field uses conditional exports with `types` condition first
+- [x] **PKG-02**: package.json has `types`, `files`, `engines`, `keywords`, `repository`, `homepage`, `bugs`, `author` fields
+- [x] **PKG-03**: package.json version set to `1.0.0` for first npm publish
+- [x] **PKG-04**: package.json has `sideEffects: false` for tree-shaking
+- [x] **PKG-05**: LICENSE file exists in project root
 
 ### Build
 
-- [ ] **BUILD-01**: tsconfig `moduleResolution` switched from `bundler` to `nodenext` (and `module` to `nodenext`)
-- [ ] **BUILD-02**: `prepublishOnly` script runs build + validation before publish
+- [x] **BUILD-01**: tsconfig `moduleResolution` switched from `bundler` to `nodenext` (and `module` to `nodenext`)
+- [x] **BUILD-02**: `prepublishOnly` script runs build + validation before publish
 
 ### Validation
 
-- [ ] **VAL-01**: publint installed as dev dependency and validates package structure
-- [ ] **VAL-02**: @arethetypeswrong/cli installed as dev dependency and validates type resolution
+- [x] **VAL-01**: publint installed as dev dependency and validates package structure
+- [x] **VAL-02**: @arethetypeswrong/cli installed as dev dependency and validates type resolution
 
 ### CI/CD
 
@@ -153,15 +153,15 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PKG-01 | Phase 4 | Pending |
-| PKG-02 | Phase 4 | Pending |
-| PKG-03 | Phase 4 | Pending |
-| PKG-04 | Phase 4 | Pending |
-| PKG-05 | Phase 4 | Pending |
-| BUILD-01 | Phase 4 | Pending |
-| BUILD-02 | Phase 4 | Pending |
-| VAL-01 | Phase 4 | Pending |
-| VAL-02 | Phase 4 | Pending |
+| PKG-01 | Phase 4 | Complete |
+| PKG-02 | Phase 4 | Complete |
+| PKG-03 | Phase 4 | Complete |
+| PKG-04 | Phase 4 | Complete |
+| PKG-05 | Phase 4 | Complete |
+| BUILD-01 | Phase 4 | Complete |
+| BUILD-02 | Phase 4 | Complete |
+| VAL-01 | Phase 4 | Complete |
+| VAL-02 | Phase 4 | Complete |
 | CI-01 | Phase 5 | Pending |
 | CI-02 | Phase 5 | Pending |
 | CI-03 | Phase 5 | Pending |
