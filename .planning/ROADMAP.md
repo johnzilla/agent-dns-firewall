@@ -13,7 +13,7 @@ This roadmap delivers an in-process domain firewall library in three phases, bui
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Core Logic** - Parsing, normalization, domain matching, and override precedence as pure functions (completed 2026-03-09)
-- [ ] **Phase 2: Lifecycle and Configuration** - HTTP fetching, factory API, start/stop/refresh lifecycle, and presets
+- [x] **Phase 2: Lifecycle and Configuration** - HTTP fetching, factory API, start/stop/refresh lifecycle, and presets (completed 2026-03-09)
 - [ ] **Phase 3: Quality and Ship** - Comprehensive tests, README, and release readiness
 
 ## Phase Details
@@ -72,5 +72,5 @@ Phases execute in numeric order: 1 -> 2 -> 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Core Logic | 2/2 | Complete   | 2026-03-09 |
-| 2. Lifecycle and Configuration | 1/2 | In Progress|  |
+| 2. Lifecycle and Configuration | 2/2 | Complete   | 2026-03-09 |
 | 3. Quality and Ship | 0/? | Not started | - |

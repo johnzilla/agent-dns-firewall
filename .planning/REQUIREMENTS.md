@@ -28,10 +28,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Lifecycle
 
-- [ ] **LIFE-01**: `createDomainFirewall(config)` returns a `DomainFirewall` with `start()`, `stop()`, and `isDomainBlocked()` methods
-- [ ] **LIFE-02**: `start()` fetches all configured sources and populates the in-memory blocklist
-- [ ] **LIFE-03**: `stop()` clears any refresh timers and cleans up resources
-- [ ] **LIFE-04**: If `refreshMinutes` is set, the firewall periodically re-fetches sources using atomic swap (no vulnerability window during refresh)
+- [x] **LIFE-01**: `createDomainFirewall(config)` returns a `DomainFirewall` with `start()`, `stop()`, and `isDomainBlocked()` methods
+- [x] **LIFE-02**: `start()` fetches all configured sources and populates the in-memory blocklist
+- [x] **LIFE-03**: `stop()` clears any refresh timers and cleans up resources
+- [x] **LIFE-04**: If `refreshMinutes` is set, the firewall periodically re-fetches sources using atomic swap (no vulnerability window during refresh)
 
 ### Resilience
 
@@ -99,10 +99,10 @@ Deferred to future release. Tracked but not in current roadmap.
 | OVER-01 | Phase 1 | Complete |
 | OVER-02 | Phase 1 | Complete |
 | OVER-03 | Phase 1 | Complete |
-| LIFE-01 | Phase 2 | Pending |
-| LIFE-02 | Phase 2 | Pending |
-| LIFE-03 | Phase 2 | Pending |
-| LIFE-04 | Phase 2 | Pending |
+| LIFE-01 | Phase 2 | Complete |
+| LIFE-02 | Phase 2 | Complete |
+| LIFE-03 | Phase 2 | Complete |
+| LIFE-04 | Phase 2 | Complete |
 | RESL-01 | Phase 2 | Complete |
 | RESL-02 | Phase 1 | Complete |
 | CONF-01 | Phase 2 | Complete |
