@@ -15,6 +15,7 @@ export interface FirewallConfig {
   allow?: string[];
   deny?: string[];
   refreshMinutes?: number;
+  log?: (level: 'warn' | 'error', message: string) => void;
 }
 
 export interface DomainFirewall {
