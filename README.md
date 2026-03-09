@@ -116,6 +116,8 @@ Returned by `isDomainBlocked()`:
 
 Blocklist fetches use conditional HTTP headers (`ETag` and `If-Modified-Since`) automatically. On the first fetch the library stores cache validators from the server response. Subsequent refreshes send these headers back -- if the server returns `304 Not Modified`, the cached domains are reused without re-downloading the list. This reduces bandwidth for both your application and blocklist providers.
 
+Each firewall instance maintains its own cache -- multiple instances never share or interfere with each other's cached data. When an instance is stopped, its cache is released automatically.
+
 No configuration is needed; this behavior is built into every `start()` and refresh cycle.
 
 ## License
