@@ -51,6 +51,30 @@ describe('parseHostsFormat', () => {
   });
 });
 
+describe('parseHostsFormat edge cases (QUAL-01)', () => {
+  it('parses tab-separated fields', () => {
+    expect(parseHostsFormat('0.0.0.0\tad.com')).toEqual(['ad.com']);
+  });
+
+  it('skips whitespace-only lines', () => {
+    expect(parseHostsFormat('   \t  \n0.0.0.0 ad.com')).toEqual(['ad.com']);
+  });
+
+  it('strips trailing whitespace after domain', () => {
+    expect(parseHostsFormat('0.0.0.0 ad.com   ')).toEqual(['ad.com']);
+  });
+});
+
+describe('parseDomainList edge cases (QUAL-01)', () => {
+  it('strips trailing whitespace from domain', () => {
+    expect(parseDomainList('  example.com  ')).toEqual(['example.com']);
+  });
+
+  it('skips whitespace-only lines between domains', () => {
+    expect(parseDomainList('a.com\n   \t  \nb.com')).toEqual(['a.com', 'b.com']);
+  });
+});
+
 describe('parseDomainList', () => {
   it('parses one domain per line', () => {
     expect(parseDomainList('ad.com\ntracker.com')).toEqual(['ad.com', 'tracker.com']);
