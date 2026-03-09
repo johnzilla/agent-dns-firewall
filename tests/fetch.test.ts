@@ -9,6 +9,7 @@ function mockFetchResponse(body: string, ok = true, status = 200): void {
       ok,
       status,
       text: () => Promise.resolve(body),
+      headers: { get: () => null },
     }),
   );
 }
@@ -28,6 +29,7 @@ const domainsSource: BlocklistSource = {
 describe('fetchSource', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    clearSourceCache();
   });
 
   afterEach(() => {
@@ -72,6 +74,7 @@ describe('fetchSource', () => {
 describe('fetchAllSources', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    clearSourceCache();
   });
 
   afterEach(() => {
@@ -85,6 +88,7 @@ describe('fetchAllSources', () => {
         ok: true,
         status: 200,
         text: () => Promise.resolve('malware.test\n'),
+        headers: { get: () => null },
       }),
     );
     const controller = new AbortController();
@@ -107,12 +111,14 @@ describe('fetchAllSources', () => {
       ok: true,
       status: 200,
       text: () => Promise.resolve('good.test\n'),
+      headers: { get: () => null },
     });
     // Second source fails
     fetchFn.mockResolvedValueOnce({
       ok: false,
       status: 503,
       text: () => Promise.resolve(''),
+      headers: { get: () => null },
     });
     vi.stubGlobal('fetch', fetchFn);
 
@@ -140,6 +146,7 @@ describe('fetchAllSources', () => {
         ok: false,
         status: 500,
         text: () => Promise.resolve(''),
+        headers: { get: () => null },
       }),
     );
     const controller = new AbortController();
@@ -159,6 +166,7 @@ describe('fetchAllSources', () => {
         ok: false,
         status: 500,
         text: () => Promise.resolve(''),
+        headers: { get: () => null },
       }),
     );
     const controller = new AbortController();

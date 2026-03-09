@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createDomainFirewall } from '../src/firewall.js';
+import { clearSourceCache } from '../src/fetch.js';
 import type { FirewallConfig } from '../src/types.js';
 
 function mockFetchResponse(body: string, ok = true, status = 200): void {
@@ -9,6 +10,7 @@ function mockFetchResponse(body: string, ok = true, status = 200): void {
       ok,
       status,
       text: () => Promise.resolve(body),
+      headers: { get: () => null },
     }),
   );
 }
@@ -26,6 +28,7 @@ describe('createDomainFirewall', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.useFakeTimers();
+    clearSourceCache();
   });
 
   afterEach(() => {
@@ -171,12 +174,14 @@ describe('createDomainFirewall', () => {
         ok: true,
         status: 200,
         text: () => Promise.resolve(hostsBody),
+        headers: { get: () => null },
       });
       // Second fetch (refresh) returns updated hosts
       fetchFn.mockResolvedValueOnce({
         ok: true,
         status: 200,
         text: () => Promise.resolve(hostsBodyUpdated),
+        headers: { get: () => null },
       });
       vi.stubGlobal('fetch', fetchFn);
 
@@ -202,12 +207,14 @@ describe('createDomainFirewall', () => {
         ok: true,
         status: 200,
         text: () => Promise.resolve(hostsBody),
+        headers: { get: () => null },
       });
       // Second fetch (refresh) fails
       fetchFn.mockResolvedValueOnce({
         ok: false,
         status: 500,
         text: () => Promise.resolve(''),
+        headers: { get: () => null },
       });
       vi.stubGlobal('fetch', fetchFn);
 
@@ -240,6 +247,7 @@ describe('createDomainFirewall', () => {
           ok: false,
           status: 500,
           text: () => Promise.resolve(''),
+          headers: { get: () => null },
         }),
       );
 
@@ -260,6 +268,7 @@ describe('createDomainFirewall', () => {
           ok: false,
           status: 500,
           text: () => Promise.resolve(''),
+          headers: { get: () => null },
         }),
       );
 
