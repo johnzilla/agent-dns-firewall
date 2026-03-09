@@ -1,5 +1,6 @@
 import type { FirewallConfig, DomainFirewall, BlockDecision } from './types.js';
 import { fetchAllSources } from './fetch.js';
+import type { CacheEntry } from './fetch.js';
 import { isDomainBlocked } from './decide.js';
 import { buildDomainIndex } from './match.js';
 
@@ -19,6 +20,7 @@ export function createDomainFirewall(config: FirewallConfig): DomainFirewall {
   let blocklistEntries: Array<{ index: Set<string>; sourceId: string }> = [];
   let refreshTimer: ReturnType<typeof setTimeout> | null = null;
   let abortController: AbortController | null = null;
+  const sourceCache = new Map<string, CacheEntry>();
 
   function scheduleRefresh(): void {
     if (!config.refreshMinutes) return;
@@ -29,6 +31,7 @@ export function createDomainFirewall(config: FirewallConfig): DomainFirewall {
           config.sources,
           abortController!.signal,
           log,
+          sourceCache,
         );
         // Atomic swap -- only replace if at least one source succeeded
         if (entries.length > 0) {
@@ -53,6 +56,7 @@ export function createDomainFirewall(config: FirewallConfig): DomainFirewall {
       config.sources,
       abortController.signal,
       log,
+      sourceCache,
     );
     blocklistEntries = entries;
 

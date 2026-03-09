@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createDomainFirewall } from '../src/firewall.js';
-import { clearSourceCache } from '../src/fetch.js';
 import type { FirewallConfig } from '../src/types.js';
 
 function mockFetchResponse(body: string, ok = true, status = 200): void {
@@ -28,7 +27,6 @@ describe('createDomainFirewall', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.useFakeTimers();
-    clearSourceCache();
   });
 
   afterEach(() => {

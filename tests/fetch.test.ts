@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fetchSource, fetchAllSources, clearSourceCache } from '../src/fetch.js';
+import { fetchSource, fetchAllSources } from '../src/fetch.js';
+import type { CacheEntry } from '../src/fetch.js';
 import type { BlocklistSource } from '../src/types.js';
 
 function mockFetchResponse(body: string, ok = true, status = 200): void {
@@ -27,9 +28,11 @@ const domainsSource: BlocklistSource = {
 };
 
 describe('fetchSource', () => {
+  let cache: Map<string, CacheEntry>;
+
   beforeEach(() => {
     vi.restoreAllMocks();
-    clearSourceCache();
+    cache = new Map<string, CacheEntry>();
   });
 
   afterEach(() => {
@@ -39,21 +42,21 @@ describe('fetchSource', () => {
   it('returns parsed domain array for hosts-format URL', async () => {
     mockFetchResponse('0.0.0.0 malware.test\n');
     const controller = new AbortController();
-    const domains = await fetchSource(hostsSource, controller.signal);
+    const domains = await fetchSource(hostsSource, controller.signal, cache);
     expect(domains).toEqual(['malware.test']);
   });
 
   it('returns parsed domain array for domains-format URL', async () => {
     mockFetchResponse('malware.test\n');
     const controller = new AbortController();
-    const domains = await fetchSource(domainsSource, controller.signal);
+    const domains = await fetchSource(domainsSource, controller.signal, cache);
     expect(domains).toEqual(['malware.test']);
   });
 
   it('throws on non-ok response', async () => {
     mockFetchResponse('', false, 503);
     const controller = new AbortController();
-    await expect(fetchSource(hostsSource, controller.signal)).rejects.toThrow(
+    await expect(fetchSource(hostsSource, controller.signal, cache)).rejects.toThrow(
       /503/,
     );
   });
@@ -61,7 +64,7 @@ describe('fetchSource', () => {
   it('passes AbortSignal to fetch call', async () => {
     mockFetchResponse('0.0.0.0 ad.test\n');
     const controller = new AbortController();
-    await fetchSource(hostsSource, controller.signal);
+    await fetchSource(hostsSource, controller.signal, cache);
     const fetchFn = globalThis.fetch as ReturnType<typeof vi.fn>;
     expect(fetchFn).toHaveBeenCalledOnce();
     const callArgs = fetchFn.mock.calls[0];
@@ -72,9 +75,11 @@ describe('fetchSource', () => {
 });
 
 describe('fetchAllSources', () => {
+  let cache: Map<string, CacheEntry>;
+
   beforeEach(() => {
     vi.restoreAllMocks();
-    clearSourceCache();
+    cache = new Map<string, CacheEntry>();
   });
 
   afterEach(() => {
@@ -97,6 +102,7 @@ describe('fetchAllSources', () => {
       [domainsSource],
       controller.signal,
       log,
+      cache,
     );
     expect(results).toHaveLength(1);
     expect(results[0].sourceId).toBe('test-domains');
@@ -133,6 +139,7 @@ describe('fetchAllSources', () => {
       [domainsSource, failSource],
       controller.signal,
       log,
+      cache,
     );
     expect(results).toHaveLength(1);
     expect(results[0].sourceId).toBe('test-domains');
@@ -155,6 +162,7 @@ describe('fetchAllSources', () => {
       [hostsSource, domainsSource],
       controller.signal,
       log,
+      cache,
     );
     expect(results).toEqual([]);
   });
@@ -175,6 +183,7 @@ describe('fetchAllSources', () => {
       [hostsSource, domainsSource],
       controller.signal,
       log,
+      cache,
     );
     expect(log).toHaveBeenCalledTimes(2);
     // Each call should have 'warn' level and contain the source ID
@@ -184,9 +193,11 @@ describe('fetchAllSources', () => {
 });
 
 describe('conditional fetching', () => {
+  let cache: Map<string, CacheEntry>;
+
   beforeEach(() => {
     vi.restoreAllMocks();
-    clearSourceCache();
+    cache = new Map<string, CacheEntry>();
   });
 
   afterEach(() => {
@@ -203,7 +214,7 @@ describe('conditional fetching', () => {
     vi.stubGlobal('fetch', fetchFn);
 
     const controller = new AbortController();
-    const domains = await fetchSource(domainsSource, controller.signal);
+    const domains = await fetchSource(domainsSource, controller.signal, cache);
     expect(domains).toEqual(['malware.test']);
 
     const callArgs = fetchFn.mock.calls[0];
@@ -231,8 +242,8 @@ describe('conditional fetching', () => {
     vi.stubGlobal('fetch', fetchFn);
 
     const controller = new AbortController();
-    await fetchSource(domainsSource, controller.signal);
-    await fetchSource(domainsSource, controller.signal);
+    await fetchSource(domainsSource, controller.signal, cache);
+    await fetchSource(domainsSource, controller.signal, cache);
 
     const secondCallHeaders = fetchFn.mock.calls[1][1]?.headers;
     expect(secondCallHeaders).toBeDefined();
@@ -256,8 +267,8 @@ describe('conditional fetching', () => {
     vi.stubGlobal('fetch', fetchFn);
 
     const controller = new AbortController();
-    await fetchSource(domainsSource, controller.signal);
-    await fetchSource(domainsSource, controller.signal);
+    await fetchSource(domainsSource, controller.signal, cache);
+    await fetchSource(domainsSource, controller.signal, cache);
 
     const secondCallHeaders = fetchFn.mock.calls[1][1]?.headers;
     expect(secondCallHeaders).toBeDefined();
@@ -286,8 +297,8 @@ describe('conditional fetching', () => {
     vi.stubGlobal('fetch', fetchFn);
 
     const controller = new AbortController();
-    await fetchSource(domainsSource, controller.signal);
-    await fetchSource(domainsSource, controller.signal);
+    await fetchSource(domainsSource, controller.signal, cache);
+    await fetchSource(domainsSource, controller.signal, cache);
 
     const secondCallHeaders = fetchFn.mock.calls[1][1]?.headers;
     expect(secondCallHeaders['If-None-Match']).toBe('"xyz789"');
@@ -312,8 +323,8 @@ describe('conditional fetching', () => {
     vi.stubGlobal('fetch', fetchFn);
 
     const controller = new AbortController();
-    await fetchSource(domainsSource, controller.signal);
-    const domains = await fetchSource(domainsSource, controller.signal);
+    await fetchSource(domainsSource, controller.signal, cache);
+    const domains = await fetchSource(domainsSource, controller.signal, cache);
 
     expect(domains).toEqual(['malware.test']);
     expect(textFn).not.toHaveBeenCalled();
@@ -343,12 +354,12 @@ describe('conditional fetching', () => {
     vi.stubGlobal('fetch', fetchFn);
 
     const controller = new AbortController();
-    await fetchSource(domainsSource, controller.signal);
-    const domains = await fetchSource(domainsSource, controller.signal);
+    await fetchSource(domainsSource, controller.signal, cache);
+    const domains = await fetchSource(domainsSource, controller.signal, cache);
     expect(domains).toEqual(['new.test']);
 
     // Third fetch should use updated ETag
-    const cachedDomains = await fetchSource(domainsSource, controller.signal);
+    const cachedDomains = await fetchSource(domainsSource, controller.signal, cache);
     expect(cachedDomains).toEqual(['new.test']);
     expect(fetchFn.mock.calls[2][1]?.headers['If-None-Match']).toBe('"v2"');
   });
@@ -389,10 +400,10 @@ describe('conditional fetching', () => {
     const sourceB: BlocklistSource = { id: 'b', url: 'https://example.com/b', format: 'domains' };
     const controller = new AbortController();
 
-    await fetchSource(sourceA, controller.signal);
-    await fetchSource(sourceB, controller.signal);
-    const domainsA = await fetchSource(sourceA, controller.signal);
-    const domainsB = await fetchSource(sourceB, controller.signal);
+    await fetchSource(sourceA, controller.signal, cache);
+    await fetchSource(sourceB, controller.signal, cache);
+    const domainsA = await fetchSource(sourceA, controller.signal, cache);
+    const domainsB = await fetchSource(sourceB, controller.signal, cache);
 
     expect(domainsA).toEqual(['a.test']);
     expect(domainsB).toEqual(['b.test']);
@@ -420,7 +431,7 @@ describe('conditional fetching', () => {
     });
     vi.stubGlobal('fetch', fetchFn);
 
-    await fetchAllSources([sourceA, sourceB], controller.signal, log);
+    await fetchAllSources([sourceA, sourceB], controller.signal, log, cache);
 
     // Second round: A returns 304, B returns 200 with new data
     fetchFn.mockResolvedValueOnce({
@@ -434,7 +445,7 @@ describe('conditional fetching', () => {
       headers: { get: (name: string) => name === 'etag' ? '"etag-b2"' : null },
     });
 
-    const results = await fetchAllSources([sourceA, sourceB], controller.signal, log);
+    const results = await fetchAllSources([sourceA, sourceB], controller.signal, log, cache);
     expect(results).toHaveLength(2);
     expect(results[0].sourceId).toBe('a');
     expect(results[0].index.has('a.test')).toBe(true);
@@ -468,7 +479,7 @@ describe('conditional fetching', () => {
     });
     vi.stubGlobal('fetch', fetchFn);
 
-    await fetchAllSources([sourceA, sourceB, sourceC], controller.signal, log);
+    await fetchAllSources([sourceA, sourceB, sourceC], controller.signal, log, cache);
 
     // Second round: A=304, B=500 (failure), C=200 with new data
     fetchFn.mockResolvedValueOnce({
@@ -487,7 +498,7 @@ describe('conditional fetching', () => {
       headers: { get: (name: string) => name === 'etag' ? '"etag-c2"' : null },
     });
 
-    const results = await fetchAllSources([sourceA, sourceB, sourceC], controller.signal, log);
+    const results = await fetchAllSources([sourceA, sourceB, sourceC], controller.signal, log, cache);
     expect(results).toHaveLength(2); // A (cached) + C (new), B failed
     expect(results[0].sourceId).toBe('a');
     expect(results[0].index.has('a.test')).toBe(true);
