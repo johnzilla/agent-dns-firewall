@@ -1,218 +1,324 @@
-# Technology Stack
+# Stack Research: npm Publishing Infrastructure
 
-**Project:** agent-dns-firewall
+**Domain:** npm package publishing for existing ESM TypeScript library
 **Researched:** 2026-03-08
-**Overall confidence:** MEDIUM (versions from training data, could not verify against npm registry)
+**Confidence:** HIGH
 
-## Constraints Driving Stack Decisions
+## Existing Stack (Do Not Change)
 
-The PROJECT.md specifies three hard constraints that collapse most decisions:
+Already validated in v1.0. Not re-researched.
 
-1. **Zero runtime dependencies** -- no lodash, no external trie libraries, no HTTP clients beyond Node built-ins
-2. **ESM-only** -- `"type": "module"`, no CJS dual-build
-3. **Node 18+ baseline** -- `fetch()` is globally available (for blocklist downloading), no polyfills needed
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| TypeScript | ^5.9.3 | Language, type checking, build via `tsc` |
+| Vitest | ^4.0.18 | Test framework |
+| Node.js | >=18 | Runtime target |
+| ESM-only | -- | Module format, `"type": "module"` |
 
-This means the stack is entirely about **dev tooling** -- build, test, lint, types. The runtime code is pure TypeScript with zero `node_modules` at install time.
+## What Needs to Change for npm Publishing
 
-## Recommended Stack
+### 1. package.json Fields
 
-### Language & Runtime
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| TypeScript | ~5.7 | Type safety, API contracts | Industry standard; strict mode catches domain-handling edge cases at compile time | MEDIUM (verify latest) |
-| Node.js | >=18.0.0 | Runtime target | 18+ gives us global `fetch()`, `AbortController`, `URL`, and stable ESM support -- everything needed without polyfills | HIGH |
-
-### Build Tool
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| tsup | ~8.x | Bundle to ESM `.js` output | Built on esbuild, zero-config for single-format library builds. One command: `tsup src/index.ts --format esm --dts`. Generates `.js` + `.d.ts` in seconds. The standard choice for small-to-mid TypeScript libraries in 2025. | MEDIUM (verify latest) |
-
-**Why tsup over alternatives:**
-
-- **tsc only**: No bundling. You'd ship the full `src/` directory structure. Works for simple cases but tsup gives you a clean single-entry bundle with tree-shaking and `.d.ts` generation in one step.
-- **unbuild**: More opinionated (Nuxt ecosystem), auto-infers config from `package.json`. Good tool but tsup has broader community adoption for standalone libraries.
-- **rollup**: Lower-level, requires plugins for TypeScript. Overkill for a single-entry library.
-- **esbuild directly**: Fast but no `.d.ts` generation. You'd need a separate `tsc --emitDeclarationOnly` step. tsup wraps this for you.
-- **Vite library mode**: Designed for frontend apps. Unnecessary abstraction for a Node library.
-
-### Test Framework
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| vitest | ~3.x | Unit & integration tests | Native ESM support, native TypeScript support (no ts-jest config), fast watch mode, compatible API with Jest but none of Jest's ESM pain. The standard for new TypeScript projects since 2024. | MEDIUM (verify latest) |
-
-**Why vitest over alternatives:**
-
-- **Jest**: ESM support is still experimental and fragile. Requires `ts-jest` or SWC transformer. Configuration overhead for what should be simple. Jest is legacy for new TypeScript ESM projects.
-- **node:test**: Built-in, zero dependencies, but assertion API is basic and no watch mode. Good for ultra-minimal projects but vitest's DX is worth the dev dependency.
-- **tap/ava**: Smaller communities, less TypeScript-first support.
-
-### Linter & Formatter
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| Biome | ~1.9+ | Lint + format in one tool | Replaces ESLint + Prettier with a single, fast Rust binary. One config file, one command. For a new project with no ESLint plugin dependencies, there is no reason to use the ESLint+Prettier combination anymore. | MEDIUM (verify latest) |
-
-**Why Biome over alternatives:**
-
-- **ESLint + Prettier**: Two tools, two configs, potential conflicts between them. ESLint's new flat config is an improvement but Biome is still simpler. For greenfield with no legacy ESLint plugins needed, Biome wins.
-- **ESLint only** (with stylistic rules): Works but Biome's formatter is faster and configuration is easier.
-- **dprint**: Good formatter but lacks lint rules. You'd still need ESLint alongside it.
-
-### Dev Runner
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| tsx | ~4.x | Run `.ts` files directly during development | `tsx src/example.ts` for quick manual testing. Uses esbuild under the hood, starts instantly. Not needed for production but invaluable during development. | MEDIUM (verify latest) |
-
-**Why tsx:**
-
-- **ts-node**: Slower startup, more configuration needed, ESM support requires flags.
-- **Node --loader**: Experimental, warnings in stderr, configuration burden.
-- **tsx**: Just works. `tsx file.ts` and you're running.
-
-### Data Structures (Implemented In-Project, Zero Dependencies)
-
-| Structure | Purpose | Why | Confidence |
-|-----------|---------|-----|------------|
-| Reversed-label trie | Domain suffix matching | A domain like `sub.malware.example.com` is stored as `["com", "example", "malware", "sub"]` in a trie. To check if a domain is blocked, split on `.`, reverse, walk the trie. If you hit a terminal node before exhausting labels, it's a suffix match. O(k) lookup where k = number of labels (typically 2-5). This is exactly how Pi-hole and AdGuard do it. | HIGH |
-| `Map<string, TrieNode>` for trie children | Child node storage | `Map` is the right choice over plain objects for arbitrary string keys. Predictable performance, no prototype chain issues. | HIGH |
-| `Set<string>` for allow/deny lists | O(1) exact lookups for small override lists | Allow/deny lists are small (tens to hundreds of entries). A `Set` is perfect -- O(1) lookup, simple API. No need for trie complexity here. | HIGH |
-
-**Why reversed-label trie over alternatives:**
-
-- **HashSet of exact domains**: O(1) lookup but no suffix matching. Blocking `example.com` would NOT block `sub.example.com`. You'd have to enumerate every subdomain, which is impossible.
-- **Regex compilation**: Compile all domains into one big regex. Terrible performance at scale (100K+ domains), hard to debug, catastrophic backtracking risk.
-- **Sorted array + binary search**: O(log n) lookup, decent, but suffix matching requires awkward string reversal and prefix matching. Trie is cleaner.
-- **Radix trie / Patricia trie**: More memory-efficient but more complex to implement. The standard trie with Map children is simple, fast enough for 200K domains, and correct. Optimize later if profiling shows need.
-- **Bloom filter**: Probabilistic -- false positives are unacceptable for a security tool. A bloom filter in front of a trie could help for the "not blocked" fast path, but adds complexity for marginal gain at this scale.
-
-### Blocklist Format Parsing (Implemented In-Project)
-
-| Format | Pattern | Parser Approach | Confidence |
-|--------|---------|-----------------|------------|
-| `hosts` format | `0.0.0.0 domain.com` or `127.0.0.1 domain.com` | Line-by-line: skip `#` comments, skip blank lines, split on whitespace, take second field, normalize. StevenBlack unified list uses this format. | HIGH |
-| `domains` format | `domain.com` (one per line) | Line-by-line: skip `#` comments, skip blank lines, trim, normalize. Hagezi lists offer this format. | HIGH |
-
-**Normalization pipeline** (applied to every extracted domain):
-1. `trim()` -- remove leading/trailing whitespace
-2. `toLowerCase()` -- DNS is case-insensitive
-3. Strip trailing `.` -- FQDN notation (`example.com.` -> `example.com`)
-4. Validate: must have at least one `.`, no spaces, reasonable length
-5. Skip special entries: `localhost`, `local`, `broadcasthost`, `ip6-*`
-
-**Why not use a parsing library:**
-- The formats are trivially simple (line-oriented, whitespace-delimited)
-- A dependency would violate the zero-runtime-deps constraint
-- Custom parser is ~30 lines of code per format
-- Full control over edge cases (malformed lines, encoding issues)
-
-## Supporting Libraries (Dev Only)
-
-| Library | Version | Purpose | When to Use | Confidence |
-|---------|---------|---------|-------------|------------|
-| `@types/node` | ~22.x | Node.js type definitions | Always -- provides types for `fetch`, `URL`, timers | MEDIUM |
-
-That's it. With zero runtime dependencies, vitest for testing, tsup for building, and Biome for linting, the dev dependency list is minimal.
-
-## Alternatives Considered
-
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| Build | tsup | tsc-only | No bundling, no single clean output |
-| Build | tsup | unbuild | Less community adoption outside Nuxt ecosystem |
-| Build | tsup | rollup | Requires plugins, more configuration |
-| Test | vitest | jest | ESM support is painful, requires ts-jest |
-| Test | vitest | node:test | Weak assertion API, no watch mode |
-| Lint | Biome | ESLint+Prettier | Two tools, more config, slower |
-| Data structure | Reversed-label trie | HashSet | No suffix matching |
-| Data structure | Reversed-label trie | Radix trie | Over-engineered for v1 |
-| Runner | tsx | ts-node | Slower, more configuration for ESM |
-
-## Do NOT Use
-
-| Technology | Why Not |
-|------------|---------|
-| Any runtime dependency (e.g., `node-fetch`, `axios`) | Hard constraint. Node 18+ has global `fetch()`. |
-| Any external trie library | Hard constraint. ~100 lines of code, not worth a dependency. |
-| Jest | ESM + TypeScript configuration is a recurring headache. Community has moved to vitest. |
-| Webpack | Application bundler, not a library bundler. |
-| Babel | Unnecessary with esbuild-based tooling (tsup). |
-| SWC standalone | Good tool but tsup already uses esbuild and handles everything. |
-| Prettier + ESLint combo | Biome does both in one tool, faster, less config. |
-| CJS output | PROJECT.md specifies ESM-only. Dual builds add complexity for no value here. |
-
-## Package.json Shape
+The current package.json is missing critical fields for npm publishing. Here is what must be added:
 
 ```jsonc
 {
   "name": "agent-dns-firewall",
+  "version": "1.1.0",
   "type": "module",
+  "description": "Before your agent calls fetch(), ask isDomainBlocked(hostname) and drop known-bad destinations",
+  "license": "MIT",
+
+  // CHANGE: Add "types" condition inside exports -- must come FIRST
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "default": "./dist/index.js"
     }
   },
+
+  // ADD: Whitelist published files (safer than .npmignore)
   "files": ["dist"],
+
+  // ADD: Required for npm listing, discoverability
+  "keywords": [
+    "dns", "firewall", "blocklist", "agent", "security",
+    "ai-agent", "domain-blocking", "hosts-file"
+  ],
+
+  // ADD: Required metadata
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/<owner>/agent-dns-firewall.git"
+  },
+  "bugs": {
+    "url": "https://github.com/<owner>/agent-dns-firewall/issues"
+  },
+  "homepage": "https://github.com/<owner>/agent-dns-firewall#readme",
+
+  // ADD: Declares minimum Node version
   "engines": {
     "node": ">=18.0.0"
   },
-  "scripts": {
-    "build": "tsup",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "lint": "biome check .",
-    "lint:fix": "biome check --fix .",
-    "typecheck": "tsc --noEmit"
+
+  // ADD: Prevent accidental publish without CI
+  "publishConfig": {
+    "access": "public"
   }
 }
 ```
 
-## tsup.config.ts Shape
+**Why each field matters:**
 
-```typescript
-import { defineConfig } from "tsup";
+| Field | Why |
+|-------|-----|
+| `exports.".".types` | TypeScript consumers with `moduleResolution: "nodenext"` or `"node16"` will NOT find types without this. The `types` condition must come first in the exports object. |
+| `files` | Whitelist approach. Only `dist/` ships to npm. Safer than `.npmignore` because it cannot accidentally leak `src/`, `tests/`, `coverage/`, or config files. `package.json`, `README.md`, and `LICENSE` are always included by npm regardless. |
+| `engines` | Documents Node 18+ requirement. `npm install` warns if user's Node is too old. |
+| `keywords` | npm search discoverability. No functional impact but important for adoption. |
+| `repository`/`bugs`/`homepage` | npm registry links. Shows up on npmjs.com package page. |
+| `publishConfig.access` | Unscoped packages default to public, but this makes intent explicit and prevents CI confusion. |
 
-export default defineConfig({
-  entry: ["src/index.ts"],
-  format: ["esm"],
-  dts: true,
-  clean: true,
-  target: "node18",
-});
+### 2. tsconfig.json Changes
+
+**Current config is almost correct.** Two changes needed:
+
+```jsonc
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    // CHANGE: "ES2022" -> "NodeNext"
+    "module": "NodeNext",
+    // CHANGE: "bundler" -> "NodeNext"
+    "moduleResolution": "NodeNext",
+    "rootDir": "src",
+    "outDir": "dist",
+    "declaration": true,        // already set
+    "declarationMap": true,     // already set
+    "sourceMap": true,          // already set
+    "strict": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": false,
+    "resolveJsonModule": true
+  },
+  "include": ["src/**/*"]
+}
 ```
 
-## Installation
+**Why change `moduleResolution` from `bundler` to `NodeNext`:**
+
+- `bundler` moduleResolution allows imports that only work in bundlers (e.g., extensionless relative imports). While this project already uses `.js` extensions everywhere (verified), the emitted `.d.ts` files inherit the moduleResolution mode.
+- Consumers using `moduleResolution: "nodenext"` or `"node16"` (which TypeScript recommends for Node.js projects) can hit resolution failures with declaration files produced under `bundler` mode.
+- `NodeNext` is the TypeScript team's recommendation for libraries published to npm. It enforces that all imports are Node.js-compatible, which is a superset of bundler-compatible.
+- Since all source imports already use `.js` extensions, switching to `NodeNext` requires zero code changes. Verified by inspecting all imports in `src/`.
+
+**Why `module: "NodeNext"` instead of `"ES2022"`:**
+
+- `module` and `moduleResolution` should be paired. `NodeNext` module + `NodeNext` moduleResolution is the correct pairing for ESM libraries targeting Node.js.
+- With `"type": "module"` in package.json, `module: "NodeNext"` emits ESM (identical output to `"ES2022"` for this project).
+
+### 3. Build Pipeline
+
+**Keep `tsc` as the build tool. Do NOT add tsup, unbuild, or rollup.**
+
+The v1.0 research recommended tsup but the project correctly chose plain `tsc` instead. For this project, `tsc` is the right choice:
+
+- The library has a single entry point (`src/index.ts`) with 9 source files
+- `tsc` already generates `.js`, `.d.ts`, `.d.ts.map`, and `.js.map` output
+- No bundling needed -- consumers' bundlers handle tree-shaking
+- No code transformation beyond TypeScript -> JavaScript
+- Zero additional dev dependencies
+
+**Add a `prepublishOnly` script** to enforce build + test before publish:
+
+```json
+{
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build && npm test"
+  }
+}
+```
+
+### 4. Package Validation Tools
+
+| Tool | Version | Purpose | When to Use |
+|------|---------|---------|-------------|
+| publint | ^0.3 | Validates package.json fields, exports, and entry points match actual files | Run before publish. Add as npm script. |
+| @arethetypeswrong/cli | ^0.17 | Validates TypeScript types resolve correctly for all moduleResolution modes | Run before publish. Catches the exact `bundler` vs `nodenext` issues. |
+
+**Add as dev dependencies and scripts:**
+
+```json
+{
+  "devDependencies": {
+    "publint": "^0.3",
+    "@arethetypeswrong/cli": "^0.17"
+  },
+  "scripts": {
+    "check:publish": "publint && attw --pack ."
+  }
+}
+```
+
+**Why these tools:**
+- `publint` catches mismatches between declared exports and actual files on disk. Prevents publishing a broken package.
+- `@arethetypeswrong/cli` (`attw`) simulates how different TypeScript configurations resolve your types. If a consumer with `moduleResolution: "node16"` would fail to find types, `attw` tells you before you publish.
+- Both are lightweight, fast, and standard in the TypeScript library ecosystem.
+
+### 5. CI/CD: GitHub Actions
+
+**Use npm trusted publishing (OIDC) instead of npm tokens.**
+
+Trusted publishing (GA since July 2025) eliminates the need to store `NPM_TOKEN` secrets. GitHub Actions authenticates directly with npm via OIDC. Provenance attestations are generated automatically.
+
+**Two workflows needed:**
+
+#### CI Workflow (`.github/workflows/ci.yml`)
+
+Runs on every push and PR. Tests across Node versions.
+
+```yaml
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+```
+
+#### Publish Workflow (`.github/workflows/publish.yml`)
+
+Triggered by GitHub release creation. Uses trusted publishing.
+
+```yaml
+name: Publish
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # Required for trusted publishing OIDC
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: npm run check:publish
+      - run: npm publish --provenance --access public
+```
+
+**Key details:**
+- `permissions.id-token: write` is required for OIDC authentication with npm
+- `--provenance` generates a verifiable link to the source code and build instructions (shows on npmjs.com)
+- Trusted publishing requires npm CLI 11.5.1+. The `setup-node@v4` with `node-version: 22` ships npm 10.x, so you may need to add `npm install -g npm@latest` before publish. Verify at implementation time.
+- The trusted publisher must be configured on npmjs.com: go to package settings, add GitHub Actions as a trusted publisher, specify the exact workflow filename (`publish.yml`), repository, and optionally an environment
+
+**Setup steps on npmjs.com:**
+1. Create an npmjs.com account (if not already)
+2. `npm login` locally to create the package initially OR use `npm publish` from CI on first release
+3. Navigate to package settings on npmjs.com
+4. Under "Trusted Publisher", add GitHub Actions with repo owner, repo name, and workflow filename
+
+### 6. Version Management
+
+**Use manual versioning. Do NOT add semantic-release or changesets.**
+
+Rationale:
+- This is a small library with a single maintainer
+- Automated version bumping adds complexity (config files, plugins, commit conventions)
+- `npm version patch|minor|major` + git tag + GitHub release is sufficient
+- semantic-release is valuable for high-frequency multi-contributor projects; overkill here
+
+**Publish workflow:**
+1. Update version: `npm version minor` (creates git tag automatically)
+2. Push: `git push && git push --tags`
+3. Create GitHub release from the tag
+4. CI publishes automatically
+
+## Installation Summary
 
 ```bash
-# Dev dependencies only -- zero runtime deps
-npm install -D typescript tsup vitest @biomejs/biome tsx @types/node
+# New dev dependencies for publishing validation
+npm install -D publint @arethetypeswrong/cli
 ```
 
-## Version Verification Note
+No new runtime dependencies. Zero.
 
-All version numbers are from training data (cutoff ~May 2025). Before `npm install`, verify latest stable versions:
+## What NOT to Add
 
-```bash
-npm view typescript version
-npm view tsup version
-npm view vitest version
-npm view @biomejs/biome version
-npm view tsx version
-```
+| Technology | Why Not |
+|------------|---------|
+| tsup / unbuild / rollup | `tsc` already handles everything. Adding a bundler adds a dependency and build complexity for zero benefit in this project. |
+| semantic-release | Overkill for a single-maintainer library. Manual `npm version` is fine. |
+| changesets | Same as above. Write a CHANGELOG.md manually when needed. |
+| np (npm publish helper) | Unnecessary with CI-based publishing. `np` is for manual publishing workflows. |
+| .npmignore | Use `"files"` field instead. Whitelist is safer than blacklist. |
+| CJS build output | Decided as out-of-scope in PROJECT.md. ESM-only. |
+| NPM_TOKEN secret | Use trusted publishing (OIDC) instead. No long-lived secrets. |
+| Bundled declaration files | `tsc` emits per-file `.d.ts` which is standard and correct. Bundled declarations (via rollup-plugin-dts or similar) are only needed for complex re-export scenarios. |
 
-Use caret ranges (`^`) in `package.json` for all dev dependencies -- these are build tools, not shipping to users.
+## Alternatives Considered
+
+| Category | Recommended | Alternative | Why Not Alternative |
+|----------|-------------|-------------|---------------------|
+| Build | tsc | tsup | Project already uses tsc, output is correct, no bundling needed |
+| Module resolution | NodeNext | bundler | `bundler` can produce .d.ts files incompatible with Node.js consumers |
+| Publishing auth | Trusted publishing (OIDC) | NPM_TOKEN secret | OIDC is more secure, no secret rotation, provenance is automatic |
+| File inclusion | `files` field | `.npmignore` | Whitelist safer than blacklist; prevents accidental leaks |
+| Versioning | Manual `npm version` | semantic-release | Overkill for single-maintainer library |
+| Package validation | publint + attw | Manual checking | Automated catches issues humans miss; fast to run |
+
+## Version Compatibility
+
+| Package | Compatible With | Notes |
+|---------|-----------------|-------|
+| TypeScript ^5.9 | `module: "NodeNext"` | Full support since TS 4.7, mature and stable |
+| Node 18+ | `"type": "module"` ESM | ESM fully stable in Node 18+ |
+| npm CLI 11.5.1+ | Trusted publishing | Required for OIDC. Node 22 ships npm 10.x -- may need explicit upgrade in CI |
+| publint ^0.3 | Node 18+ | Lightweight, no compatibility concerns |
+| @arethetypeswrong/cli ^0.17 | Node 18+ | Lightweight, no compatibility concerns |
 
 ## Sources
 
-- TypeScript handbook and release notes (typescriptlang.org)
-- tsup documentation (tsup.egoist.dev)
-- vitest documentation (vitest.dev)
-- Biome documentation (biomejs.dev)
-- StevenBlack/hosts repository (github.com/StevenBlack/hosts) for hosts format specification
-- Hagezi DNS blocklists (github.com/hagezi/dns-blocklists) for domains format specification
-- Pi-hole source code for domain matching approach (trie-based suffix matching)
-- AdGuard DNS filter engine documentation for trie-based matching validation
+- [TypeScript: Choosing Compiler Options](https://www.typescriptlang.org/docs/handbook/modules/guides/choosing-compiler-options.html) -- moduleResolution recommendation for libraries
+- [Andrew Branch: Is nodenext right for libraries?](https://blog.andrewbran.ch/is-nodenext-right-for-libraries-that-dont-target-node-js/) -- why NodeNext over bundler for npm packages
+- [npm Docs: Trusted publishing](https://docs.npmjs.com/trusted-publishers/) -- OIDC setup
+- [npm Docs: Generating provenance statements](https://docs.npmjs.com/generating-provenance-statements/) -- provenance with GitHub Actions
+- [Phil Nash: Things you need to do for npm trusted publishing to work](https://philna.sh/blog/2026/01/28/trusted-publishing-npm/) -- practical gotchas
+- [GitHub Blog: npm trusted publishing with OIDC is generally available](https://github.blog/changelog/2025-07-31-npm-trusted-publishing-with-oidc-is-generally-available/) -- GA announcement
+- [npm CLI Wiki: Files & Ignores](https://github.com/npm/cli/wiki/Files-&-Ignores) -- files field vs .npmignore
+- [2ality: Publishing ESM-based npm packages with TypeScript](https://2ality.com/2025/02/typescript-esm-packages.html) -- ESM package.json patterns
+- [publint rules](https://publint.dev/rules) -- what publint validates
+- [Sindre Sorhus: Pure ESM package](https://gist.github.com/sindresorhus/a39789f98801d908bbc7ff3ecc99d99c) -- ESM-only package patterns
+
+---
+*Stack research for: agent-dns-firewall v1.1 npm publishing*
+*Researched: 2026-03-08*

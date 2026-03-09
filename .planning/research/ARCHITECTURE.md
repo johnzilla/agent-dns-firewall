@@ -1,330 +1,405 @@
-# Architecture Patterns
+# Architecture Research
 
-**Domain:** In-process DNS blocklist / hostname egress guard
+**Domain:** npm publishing infrastructure for existing TypeScript ESM library
 **Researched:** 2026-03-08
+**Confidence:** HIGH
 
-## How Existing Systems Are Structured
+## System Overview
 
-### Pi-hole (Network-Level DNS Firewall)
-
-Pi-hole operates as a DNS sinkhole with these major components:
-
-1. **List Manager** -- downloads and merges multiple blocklists on a schedule
-2. **Parser/Normalizer** -- converts hosts-format and domains-format lists into a unified internal representation
-3. **Gravity Database** -- SQLite store holding all blocked domains, allow/deny overrides, and list metadata
-4. **FTL (Faster Than Light) DNS Engine** -- custom fork of dnsmasq that intercepts DNS queries, checks the gravity database, and either sinks or forwards
-5. **Allow/Deny Override Layer** -- user-defined lists that take precedence over blocklists
-
-Key architectural insight: Pi-hole separates the *list lifecycle* (fetch, parse, store, refresh) from the *query path* (lookup, decide, respond). The query path is optimized for speed; the list lifecycle tolerates latency.
-
-### Hosts-File Tools (StevenBlack, Hagezi)
-
-These are simpler -- they produce flat files in either:
-
-- **Hosts format:** `0.0.0.0 malware.example.com` (one entry per line, IP + hostname)
-- **Domains format:** `malware.example.com` (one domain per line)
-
-Parsing rules: skip lines starting with `#`, ignore inline comments after `#`, normalize whitespace, lowercase the hostname, strip trailing dots.
-
-### Browser-Based Blockers (uBlock Origin)
-
-uBlock Origin uses a highly optimized approach:
-
-1. **Filter Compilation** -- parses filter lists into a compact binary representation at load time
-2. **Hostname Trie** -- stores blocked hostnames in a trie (prefix tree on reversed domain labels) for O(k) lookup where k = number of domain labels
-3. **Hot Path Optimization** -- the lookup function is the most performance-critical code; everything else can be slower
-
-### Common Pattern Across All Systems
-
-Every DNS blocklist system follows the same fundamental pipeline:
+This architecture covers the CI/CD pipeline and package configuration that integrates with the existing `agent-dns-firewall` library. The library source code and build system (tsc, Vitest) are unchanged. This milestone adds publishing infrastructure around them.
 
 ```
-[List Sources] --> [Fetch] --> [Parse] --> [Normalize] --> [Index] --> [Lookup]
-                                                              ^
-                                                    [Allow/Deny Overrides]
+┌─────────────────────────────────────────────────────────────────┐
+│                     Developer Workflow                           │
+│                                                                 │
+│  git tag v1.1.0 && git push --tags                              │
+│         │                                                       │
+└─────────┼───────────────────────────────────────────────────────┘
+          │
+          v
+┌─────────────────────────────────────────────────────────────────┐
+│                   GitHub Actions CI/CD                           │
+│                                                                 │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────┐   │
+│  │   CI (test)  │───>│  Build Gate  │───>│  Publish to npm  │   │
+│  │  every push  │    │  verify dist │    │  tag push only   │   │
+│  └──────────────┘    └──────────────┘    └──────────────────┘   │
+│                                                │                │
+│                                          OIDC id-token          │
+│                                          + provenance           │
+└────────────────────────────────────────────────┼────────────────┘
+                                                 │
+                                                 v
+                                    ┌────────────────────────┐
+                                    │     npm Registry       │
+                                    │  agent-dns-firewall    │
+                                    │  + provenance badge    │
+                                    └────────────────────────┘
 ```
 
-The architectural constant: **ingest is slow and infrequent; lookup is fast and frequent.** All design decisions flow from this asymmetry.
+### Component Responsibilities
 
-## Recommended Architecture for agent-dns-firewall
+| Component | Responsibility | Typical Implementation |
+|-----------|----------------|------------------------|
+| CI workflow | Run tests + type-check on every push/PR | `.github/workflows/ci.yml` |
+| Publish workflow | Build, verify, publish on version tag push | `.github/workflows/publish.yml` |
+| Package metadata | `files`, `exports`, `types`, `repository` fields | `package.json` modifications |
+| npm trusted publisher | OIDC-based auth, no long-lived tokens | npm.js settings + workflow permissions |
 
-### Component Boundaries
+## New and Modified Files
 
-| Component | Responsibility | Communicates With |
-|-----------|---------------|-------------------|
-| **Config Validator** | Validates and normalizes user-provided configuration | Factory (entry point) |
-| **List Fetcher** | Downloads blocklist content from HTTP(S) URLs | List Parser |
-| **List Parser** | Parses hosts-format and domains-format text into domain arrays | Domain Index |
-| **Domain Normalizer** | Lowercases, trims, strips trailing dots, validates hostname shape | List Parser, Allow/Deny layer |
-| **Domain Index** | Stores blocked domains in a fast-lookup data structure; handles suffix matching | Lookup Engine |
-| **Allow/Deny Layer** | Manages user-defined override lists (allow = pass, deny = block) | Lookup Engine |
-| **Lookup Engine** | Orchestrates the decision: allow list --> deny list --> domain index --> not blocked | Public API |
-| **Refresh Scheduler** | Periodically triggers re-fetch of all lists | List Fetcher |
-| **Factory (`createDomainFirewall`)** | Wires components together, returns public API surface | All components |
+This is the critical integration map. The existing codebase is stable; this milestone adds files around it.
 
-### Data Flow
+### New Files
 
-```
-User calls createDomainFirewall(config)
-  |
-  v
-Config Validator -- validates sources, options, allow/deny lists
-  |
-  v
-Factory wires up components, calls start()
-  |
-  v
-start() triggers initial load:
-  |
-  +---> List Fetcher (for each source URL)
-  |       |
-  |       v
-  |     List Parser (hosts-format or domains-format)
-  |       |
-  |       v
-  |     Domain Normalizer (per hostname)
-  |       |
-  |       v
-  |     Domain Index <-- accumulates all domains from all sources
-  |
-  +---> Allow/Deny Layer <-- built from config.allow / config.deny arrays
-  |
-  v
-Ready. isDomainBlocked(hostname) is now callable.
-```
+| File | Purpose |
+|------|---------|
+| `.github/workflows/ci.yml` | Test + type-check on push and PR |
+| `.github/workflows/publish.yml` | Build + publish on version tag push |
 
-**Query path (hot path):**
+### Modified Files
 
-```
-isDomainBlocked("sub.malware.example.com")
-  |
-  v
-Domain Normalizer -- normalize input hostname
-  |
-  v
-Allow List check -- if match, return { blocked: false, reason: "allow" }
-  |
-  v
-Deny List check -- if match, return { blocked: true, reason: "deny", listId }
-  |
-  v
-Domain Index lookup (suffix match) -- if match, return { blocked: true, reason: "blocklist", listId }
-  |
-  v
-Return { blocked: false }
+| File | Changes | Why |
+|------|---------|-----|
+| `package.json` | Add `files`, `types`, `repository`, `keywords`, `author`, `engines`; update `exports` to include types | npm registry metadata and package contents control |
+| `tsconfig.json` | No changes needed | Already has `declaration: true` and `declarationMap: true` |
+
+### Unchanged Files
+
+Everything in `src/`, `tests/`, `vitest.config.ts`, `LICENSE`, `README.md` -- the library code and test infrastructure remain untouched.
+
+## Architectural Patterns
+
+### Pattern 1: Separate CI and Publish Workflows
+
+**What:** Two distinct workflow files -- `ci.yml` runs on every push/PR; `publish.yml` runs only on version tag push.
+
+**When to use:** Always, for any npm package with CI.
+
+**Trade-offs:** Slightly more files, but clear separation of concerns. CI runs fast on every push. Publish only triggers intentionally via tag. Prevents accidental publishes.
+
+**ci.yml structure:**
+```yaml
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
 ```
 
-**Refresh path (background):**
+**publish.yml structure:**
+```yaml
+name: Publish
+on:
+  push:
+    tags: ['v*']
 
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write    # Required for OIDC trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: npm publish --provenance --access public
 ```
-Refresh Scheduler (setInterval at refreshMinutes)
-  |
-  v
-List Fetcher --> Parser --> Normalizer --> new Domain Index
-  |
-  v
-Atomic swap: replace old index with new index (no lock needed, single-threaded JS)
+
+### Pattern 2: OIDC Trusted Publishing (No Tokens)
+
+**What:** npm authenticates the publish via GitHub Actions OIDC tokens instead of stored NPM_TOKEN secrets. npm automatically generates provenance attestations.
+
+**When to use:** Always for new packages in 2026. Classic npm tokens were permanently revoked December 9, 2025. Granular tokens expire in 90 days max. OIDC is the preferred path.
+
+**Trade-offs:** Requires npm CLI 11.5.1+ and Node 22.14.0+. The first publish of a brand-new package cannot use OIDC (the package must exist on npm first). Workaround: do the initial publish manually with `npm publish` from local machine using a short-lived granular token, then configure trusted publishing for all subsequent releases.
+
+**Setup steps:**
+1. Publish initial version manually (one-time)
+2. Go to npmjs.com package settings, add trusted publisher: `owner/repo`, workflow `publish.yml`, environment (optional)
+3. All subsequent publishes use OIDC -- no secrets needed in GitHub repo settings
+
+**Critical requirements:**
+- `permissions.id-token: write` in workflow
+- `package.json` must have `repository.url` matching the GitHub repo URL exactly
+- No `NODE_AUTH_TOKEN` or npm token set in the environment (OIDC detection fails if a token is present)
+- Node 22+ for the publish job (npm CLI version requirement)
+
+### Pattern 3: Build Verification Before Publish
+
+**What:** The publish workflow re-runs the full build and test suite before publishing, even though CI already ran on the commit.
+
+**When to use:** Always. The tag may point to a commit that was pushed without CI passing. Belt and suspenders.
+
+**Trade-offs:** Slightly slower publish (adds ~30-60 seconds for this small project). Worth it for safety.
+
+**Verification steps in order:**
+```
+1. npm ci          -- clean install from lockfile
+2. npm run build   -- tsc compiles to dist/
+3. npm test        -- vitest runs all 111+ tests
+4. npm publish     -- only if all above pass
 ```
 
-### Data Structure: Domain Index
+### Pattern 4: Package Contents Control via `files` Field
 
-**Use a `Set<string>` with suffix expansion, not a trie.** Here is why:
+**What:** Use `package.json` `"files"` array instead of `.npmignore` to whitelist what gets published.
 
-- Blocklists typically contain 50K-200K domains. A `Set` with suffix walking is fast enough for this scale.
-- A trie adds complexity (custom data structure, serialization) with no meaningful benefit at this scale.
-- V8's `Set` is backed by a hash table with O(1) average lookup. Walking up the domain hierarchy (at most 5-7 levels for any real hostname) means at most 5-7 hash lookups per query.
+**When to use:** Always for TypeScript packages. Whitelist is safer than blacklist.
 
-**Suffix matching algorithm:**
+**Why:** With `.npmignore`, forgetting to exclude a file means it ships. With `"files"`, forgetting to include a file means it does not ship -- the package may break, but you will catch it immediately. You never accidentally publish `tests/`, `coverage/`, or `.env` files.
 
-```typescript
-// For hostname "a.b.malware.example.com", check:
-//   "a.b.malware.example.com"  (exact)
-//   "b.malware.example.com"    (parent)
-//   "malware.example.com"      (parent)
-//   "example.com"              (parent)
-//   "com"                      (parent -- won't be in list, but cheap to check)
-function isBlocked(hostname: string, blockedSet: Set<string>): boolean {
-  let domain = hostname;
-  while (domain) {
-    if (blockedSet.has(domain)) return true;
-    const dot = domain.indexOf('.');
-    if (dot === -1) break;
-    domain = domain.substring(dot + 1);
-  }
-  return false;
+**Configuration:**
+```json
+{
+  "files": [
+    "dist/"
+  ]
 }
 ```
 
-This is the same approach Pi-hole's FTL uses conceptually (walk up the domain tree), just with a hash set instead of a database. At 200K entries, the `Set` consumes roughly 15-30 MB of memory -- acceptable for an in-process library.
+This publishes only `dist/` (which contains `.js`, `.d.ts`, `.d.ts.map`, `.js.map` files). `package.json`, `README.md`, and `LICENSE` are always included by npm automatically.
 
-**When to reconsider:** If lists exceed 1M+ domains, a trie or compressed radix tree would save memory. That is not a v1 concern.
+## Data Flow
 
-### Error Boundaries
+### Publish Pipeline Flow
 
-Each component has a defined failure mode:
+```
+Developer tags a commit:
+  git tag v1.1.0
+  git push --tags
+      │
+      v
+GitHub detects tag push matching 'v*'
+      │
+      v
+publish.yml workflow starts
+      │
+      ├── actions/checkout@v4 (get source)
+      │
+      ├── actions/setup-node@v4 (Node 22 + registry URL)
+      │
+      ├── npm ci (install from lockfile)
+      │
+      ├── npm run build (tsc --> dist/)
+      │     Output: dist/index.js, dist/index.d.ts, etc.
+      │
+      ├── npm test (vitest run)
+      │     Gate: fails here = no publish
+      │
+      └── npm publish --provenance --access public
+            │
+            ├── OIDC: GitHub mints id-token
+            ├── npm verifies token against trusted publisher config
+            ├── npm reads "files" field --> packs only dist/ + package.json + README + LICENSE
+            ├── npm generates provenance attestation (Sigstore)
+            └── Package published to registry with provenance badge
+```
 
-| Component | Failure Mode | Recovery |
-|-----------|-------------|----------|
-| List Fetcher | Network error, timeout, HTTP error | Log warning, skip source, continue with remaining sources |
-| List Parser | Malformed lines | Skip individual bad lines, parse rest of file |
-| Domain Normalizer | Invalid hostname chars | Skip domain, log at debug level |
-| Domain Index | Empty (all sources failed) | Operate with empty set -- nothing blocked, log warning |
-| Refresh Scheduler | Fetch fails on refresh | Keep old index, log warning, try again next interval |
-| Lookup Engine | Any unexpected error | Catch, return `{ blocked: false }` -- never throw from hot path |
+### CI Flow (Every Push/PR)
 
-The critical invariant: **`isDomainBlocked()` never throws.** It always returns a `BlockDecision`. This is essential for agent safety -- a DNS firewall crash should not crash the agent.
+```
+Push to main or PR opened
+      │
+      v
+ci.yml workflow starts
+      │
+      ├── Matrix: Node 18, 20, 22
+      │
+      ├── npm ci
+      ├── npm run build
+      └── npm test
+```
 
-## Patterns to Follow
+### Version Management Flow
 
-### Pattern 1: Atomic Index Swap on Refresh
+```
+Developer decides to release:
+  1. Update version in package.json (npm version patch/minor/major)
+     - npm version creates commit + tag automatically
+  2. Push commit and tag: git push && git push --tags
+  3. GitHub Actions takes over
+```
 
-**What:** When refreshing lists, build a completely new index, then replace the old one in a single assignment.
+## Integration Points
 
-**When:** Every refresh cycle.
+### External Services
 
-**Why:** Avoids partial state. The old index serves queries until the new one is fully built. No locking needed in single-threaded Node.js.
+| Service | Integration Pattern | Notes |
+|---------|---------------------|-------|
+| npm Registry | OIDC trusted publishing | No stored secrets; requires one-time manual first publish |
+| GitHub Actions | Workflow files in `.github/workflows/` | Uses `actions/checkout@v4` and `actions/setup-node@v4` |
+| Sigstore | Automatic via `--provenance` flag | Provenance attestation for supply chain security |
 
-```typescript
-// Inside the firewall instance
-let currentIndex: Set<string> = new Set();
+### Internal Boundaries
 
-async function refresh(): Promise<void> {
-  const newIndex = new Set<string>();
-  for (const source of sources) {
-    try {
-      const domains = await fetchAndParse(source);
-      for (const d of domains) newIndex.add(d);
-    } catch (err) {
-      logger.warn(`Failed to fetch ${source.url}: ${err.message}`);
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| Source (src/) --> Build (dist/) | `tsc` via `npm run build` | Already configured, no changes needed |
+| Build (dist/) --> Package | `files` field in package.json | Only dist/ contents are published |
+| Tests --> Publish gate | Exit code from `npm test` | Workflow step fails = publish step skipped |
+| package.json `exports` --> Consumer | `"."` entry point | Must reference `./dist/index.js` (already does) |
+| package.json `types` --> Consumer | Types entry point | Must add `"types": "./dist/index.d.ts"` |
+
+## package.json Integration
+
+The existing `package.json` needs these additions for npm publishing. Showing only the diff:
+
+```json
+{
+  "name": "agent-dns-firewall",
+  "version": "1.1.0",
+  "type": "module",
+  "description": "Before your agent calls fetch(), ask isDomainBlocked(hostname) and drop known-bad destinations",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     }
-  }
-  currentIndex = newIndex; // atomic swap
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agent-dns-firewall/agent-dns-firewall.git"
+  },
+  "keywords": [
+    "dns",
+    "firewall",
+    "blocklist",
+    "agent",
+    "security"
+  ]
 }
 ```
 
-### Pattern 2: Parse-Time Normalization
+**Key changes from current:**
+- `exports` upgraded from simple string to conditional exports with `types` condition (for TypeScript consumers)
+- `types` top-level field added (for older tooling that does not read conditional exports)
+- `files` added (controls what ships to npm)
+- `engines` added (documents Node 18+ requirement)
+- `repository` added (required for OIDC trusted publishing to work)
+- `keywords` added (npm discoverability)
+- `version` bumped to `1.1.0` (at publish time)
 
-**What:** Normalize domains once during parsing, not on every lookup.
+## Anti-Patterns
 
-**When:** During list ingestion and during allow/deny list construction.
+### Anti-Pattern 1: Using .npmignore Instead of `files`
 
-**Why:** Amortizes the cost. A blocklist is parsed once (or once per refresh), but queried thousands of times. Normalize the stored data, then normalize only the query input at lookup time.
+**What people do:** Create `.npmignore` to exclude `src/`, `tests/`, `coverage/`, etc.
+**Why it is wrong:** Blacklist approach. Easy to forget an entry. New directories (like `.planning/`) silently ship to npm.
+**Do this instead:** Use `"files": ["dist/"]` in package.json. Whitelist only what consumers need.
 
-### Pattern 3: Precedence Chain (Allow > Deny > Blocklist)
+### Anti-Pattern 2: Publishing from Local Machine as Standard Practice
 
-**What:** The lookup engine checks overrides in a fixed order: allow list first, then deny list, then blocklist.
+**What people do:** Run `npm publish` from their laptop for every release.
+**Why it is wrong:** No reproducibility. No audit trail. Risk of dirty working tree. No provenance attestation.
+**Do this instead:** Publish only via CI. Local publish is acceptable only for the initial package creation (OIDC requirement).
 
-**When:** Every `isDomainBlocked()` call.
+### Anti-Pattern 3: Storing Long-Lived NPM_TOKEN in GitHub Secrets
 
-**Why:** This matches the project spec. Allow = intentional override ("I trust this domain regardless"). Deny = intentional block ("block this even if it's not on any list"). Blocklist = community-maintained lists.
+**What people do:** Create a granular access token, store as `NPM_TOKEN` secret, use `NODE_AUTH_TOKEN`.
+**Why it is wrong:** Granular tokens expire in 90 days max (as of 2025). Classic tokens were revoked entirely. Token rotation is operational burden.
+**Do this instead:** Use OIDC trusted publishing. Zero tokens to manage after initial setup.
 
-```
-allow wins over deny wins over blocklist wins over default-not-blocked
-```
+### Anti-Pattern 4: Skipping Tests in Publish Workflow
 
-### Pattern 4: Source Abstraction
+**What people do:** Trust that CI already passed and skip `npm test` in the publish workflow.
+**Why it is wrong:** Tags can be pushed to commits that never had CI run. Race conditions between push and CI.
+**Do this instead:** Always run the full test suite in the publish workflow before `npm publish`.
 
-**What:** Each blocklist source is described as a `{ url, format }` object. The fetcher and parser are format-aware but source-agnostic.
+### Anti-Pattern 5: Publishing Without `--provenance`
 
-**When:** Configuration time.
-
-**Why:** Makes it trivial to add new formats later (adblock-style, RPZ, etc.) without changing the pipeline. Presets are just pre-built source arrays.
-
-## Anti-Patterns to Avoid
-
-### Anti-Pattern 1: Trie / Radix Tree for v1
-
-**What:** Building a custom trie data structure for domain matching.
-
-**Why bad:** Over-engineering. At 200K domains, a `Set` with suffix walking is fast enough (sub-millisecond lookups). A trie adds code complexity, debugging difficulty, and custom serialization needs. Benchmark first, optimize later.
-
-**Instead:** Use `Set<string>` with the suffix walking algorithm. Profile under realistic load. Switch to a trie only if profiling shows the `Set` is a bottleneck (it won't be).
-
-### Anti-Pattern 2: Synchronous Fetch on First Query
-
-**What:** Lazily loading blocklists on the first call to `isDomainBlocked()`.
-
-**Why bad:** Makes the first query unexpectedly slow (seconds of network I/O). Violates the principle that lookup is always fast.
-
-**Instead:** Load lists during `start()`. The `isDomainBlocked()` function always operates on whatever index is currently loaded (even if empty during initial fetch).
-
-### Anti-Pattern 3: Throwing from isDomainBlocked()
-
-**What:** Letting exceptions propagate from the lookup function.
-
-**Why bad:** This library is a safety guard for AI agents. If the guard itself crashes, the agent either halts (bad UX) or proceeds without protection (defeats the purpose).
-
-**Instead:** Wrap the entire lookup in try/catch. On error, return `{ blocked: false }`. Log the error. The library degrades to "allow all" rather than crashing.
-
-### Anti-Pattern 4: Shared Mutable State Between Instances
-
-**What:** Using module-level variables for the domain index or config.
-
-**Why bad:** Prevents multiple firewall instances with different configs. Breaks testability.
-
-**Instead:** The factory function creates a closure. All state lives inside the closure. Each `createDomainFirewall()` call produces an independent instance.
-
-## Scalability Considerations
-
-| Concern | 10K domains | 200K domains | 1M+ domains |
-|---------|-------------|--------------|-------------|
-| Memory | ~1 MB | ~15-30 MB | ~80-150 MB (consider trie) |
-| Lookup time | <0.01 ms | <0.05 ms | <0.1 ms (still fine with Set) |
-| Parse time | <100 ms | ~500 ms-1 s | ~3-5 s (consider streaming parser) |
-| Refresh | Negligible | ~2-5 s (network + parse) | ~10-20 s (consider incremental) |
-
-The v1 target (StevenBlack + Hagezi) is ~150K-200K domains total. `Set<string>` handles this comfortably.
+**What people do:** Publish without provenance flag, or use OIDC which auto-generates it but do not verify it appears on npm.
+**Why it is wrong:** Consumers cannot verify the package was built from the claimed source. Supply chain trust gap.
+**Do this instead:** Always use `--provenance`. Verify the badge appears on npmjs.com after first publish.
 
 ## Suggested Build Order
 
-Based on component dependencies:
+Based on dependencies between new components:
 
 ```
-Phase 1: Domain Normalizer + List Parser + Domain Index
-  (These are pure functions with no I/O -- easiest to build and test)
+Phase 1: Package metadata (package.json changes)
+  - Add files, types, exports, repository, engines, keywords
+  - Verify with npm pack --dry-run that only dist/ ships
+  - No external dependencies; pure configuration
 
-Phase 2: Lookup Engine + Allow/Deny Layer
-  (Depends on Domain Index; this is the core value proposition)
+Phase 2: CI workflow (.github/workflows/ci.yml)
+  - Test + build on push/PR
+  - Matrix across Node 18, 20, 22
+  - Must pass before Phase 3 can be verified
 
-Phase 3: List Fetcher + Config Validator + Factory
-  (Adds I/O; connects everything; produces the public API)
+Phase 3: Publish workflow (.github/workflows/publish.yml)
+  - Tag-triggered publish with OIDC + provenance
+  - Depends on Phase 1 (package.json must be correct)
+  - Depends on Phase 2 (CI workflow pattern to reference)
 
-Phase 4: Refresh Scheduler + Presets
-  (Adds lifecycle management; presets are just config objects)
+Phase 4: First publish + trusted publisher setup
+  - Manual first publish with short-lived granular token
+  - Configure trusted publisher on npmjs.com
+  - Tag a release to verify automated pipeline end-to-end
 ```
 
-**Rationale:** Build from the inside out. The innermost components (normalizer, parser, index) have no dependencies and are easy to unit test. Each subsequent phase adds a layer that depends on the previous one. The factory (Phase 3) is where the public API crystallizes -- by then, all internal components exist and are tested.
+**Rationale:** Package metadata must be correct before any publish attempt. CI workflow establishes the test pattern that publish workflow reuses. Publish workflow depends on correct metadata. First publish is the final verification step.
 
-## Module Structure
+## Version Strategy
 
-```
-src/
-  index.ts              -- public API: createDomainFirewall, presets, types
-  types.ts              -- BlockDecision, FirewallConfig, Source, etc.
-  factory.ts            -- createDomainFirewall implementation
-  normalizer.ts         -- hostname normalization
-  parser.ts             -- hosts-format and domains-format parsers
-  domain-index.ts       -- Set-based domain index with suffix matching
-  lookup.ts             -- precedence chain (allow > deny > blocklist)
-  fetcher.ts            -- HTTP(S) list fetching with error handling
-  scheduler.ts          -- refresh interval management
-  presets.ts            -- PRESET_STEVENBLACK_UNIFIED, PRESET_HAGEZI_LIGHT
+Use `npm version` command for version management:
+
+```bash
+npm version patch   # 1.1.0 -> 1.1.1 (bug fixes)
+npm version minor   # 1.1.0 -> 1.2.0 (new features)
+npm version major   # 1.1.0 -> 2.0.0 (breaking changes)
 ```
 
-Each file is a single concern. No file depends on more than 2-3 others. The dependency graph is a clean DAG:
+`npm version` automatically:
+1. Updates `version` in `package.json`
+2. Creates a git commit with message `v1.1.0`
+3. Creates a git tag `v1.1.0`
 
-```
-index.ts --> factory.ts --> lookup.ts --> domain-index.ts --> normalizer.ts
-                        --> fetcher.ts --> parser.ts --> normalizer.ts
-                        --> scheduler.ts
-                        --> presets.ts
-             types.ts (imported by all)
-```
+Then `git push && git push --tags` triggers the publish workflow.
+
+This is simpler than changesets or semantic-release for a single-maintainer library with infrequent releases.
 
 ## Sources
 
-- Pi-hole architecture: Based on Pi-hole FTL engine design (custom dnsmasq fork with gravity database). Well-documented in Pi-hole docs. **MEDIUM confidence** (training data, established project with stable architecture).
-- Hosts file format: De facto standard from `/etc/hosts`. StevenBlack and Hagezi follow this convention. **HIGH confidence** (format is decades old and unchanged).
-- uBlock Origin trie approach: Documented in uBlock Origin wiki and source code. **MEDIUM confidence** (training data, but architecture is well-known).
-- Set-based suffix matching performance: Based on V8 engine characteristics and standard algorithmic analysis. **HIGH confidence** (fundamental CS + well-known V8 behavior).
-- Memory estimates: Rough calculations based on V8 string internals (~50-150 bytes per Set entry including string overhead). **MEDIUM confidence** (estimates, not benchmarked for this specific use case).
+- [npm Trusted Publishers docs](https://docs.npmjs.com/trusted-publishers/) -- OIDC setup, requirements, limitations. **HIGH confidence.**
+- [npm Provenance docs](https://docs.npmjs.com/generating-provenance-statements/) -- provenance flag, Sigstore integration. **HIGH confidence.**
+- [npm classic tokens revoked (GitHub Changelog, Dec 2025)](https://github.blog/changelog/2025-12-09-npm-classic-tokens-revoked-session-based-auth-and-cli-token-management-now-available/) -- token landscape change. **HIGH confidence.**
+- [npm security update: granular token changes (Nov 2025)](https://github.blog/changelog/2025-11-05-npm-security-update-classic-token-creation-disabled-and-granular-token-changes/) -- 90-day max expiry. **HIGH confidence.**
+- [npm trusted publishing GA (Jul 2025)](https://github.blog/changelog/2025-07-31-npm-trusted-publishing-with-oidc-is-generally-available/) -- OIDC general availability. **HIGH confidence.**
+- [Publishing npm with provenance (blog, Jan 2026)](https://blog.revathskumar.com/2026/01/publish-npm-module-with-provenance-statement.html) -- practical walkthrough. **MEDIUM confidence.**
+- [Trusted publishing practical tips (Phil Nash, Jan 2026)](https://philna.sh/blog/2026/01/28/trusted-publishing-npm/) -- gotchas and setup details. **MEDIUM confidence.**
+- [npm/cli wiki: Files & Ignores](https://github.com/npm/cli/wiki/Files-&-Ignores) -- files field vs .npmignore behavior. **HIGH confidence.**
+- [Node.js guide: Publishing a TypeScript package](https://nodejs.org/en/learn/typescript/publishing-a-ts-package) -- official Node.js guidance. **HIGH confidence.**
+
+---
+*Architecture research for: npm publishing infrastructure (v1.1 milestone)*
+*Researched: 2026-03-08*

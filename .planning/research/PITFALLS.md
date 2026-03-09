@@ -1,264 +1,310 @@
-# Domain Pitfalls
+# Pitfalls Research
 
-**Domain:** DNS blocklist / in-process domain firewall library (TypeScript)
+**Domain:** Publishing a TypeScript ESM-only library to npm
 **Researched:** 2026-03-08
-**Confidence:** MEDIUM (training data; web verification tools unavailable)
+**Confidence:** HIGH
 
 ## Critical Pitfalls
 
-Mistakes that cause incorrect blocking, memory blowups, or security gaps.
+### Pitfall 1: moduleResolution "bundler" breaks consumer type resolution
 
-### Pitfall 1: Hosts File Format Is Messier Than You Think
+**What goes wrong:**
+The project currently uses `"moduleResolution": "bundler"` in tsconfig.json. This setting is "infectious" -- it allows code patterns (like extensionless relative imports) that only work when consumers also use a bundler. Consumers using `moduleResolution: "node16"` or `"nodenext"` (the correct settings for Node.js projects) will fail to resolve types from the published package. TypeScript will find the `.d.ts` files but refuse to use them, producing errors like "there are types at this path but this result could not be resolved when respecting package.json exports."
 
-**What goes wrong:** Parsers assume `0.0.0.0 domain.com` and break on the real-world variations found in StevenBlack, Hagezi, and community lists.
+**Why it happens:**
+`"bundler"` is convenient during development because it does not require `.js` extensions on relative imports. But published packages must work for ALL consumers, not just bundler users. The TypeScript documentation explicitly states that `"nodenext"` checks that output works in Node.js, and code that works in Node.js will generally work in bundlers too -- but not the reverse.
 
-**Why it happens:** The "hosts" format has no formal spec. Real files contain:
-- Both `0.0.0.0` and `127.0.0.1` as the IP prefix (and occasionally `::1` for IPv6)
-- Inline comments: `0.0.0.0 tracker.example.com # analytics tracker`
-- Blank lines, header comment blocks (lines starting with `#`)
-- Lines with ONLY a domain (no IP prefix) in some hybrid lists
-- Windows-style `\r\n` line endings mixed with Unix `\n`
-- Tab characters as separators instead of spaces
-- Multiple domains on a single line: `0.0.0.0 domain1.com domain2.com`
-- Entries for `localhost`, `broadcasthost`, `local`, `0.0.0.0` itself as domains in preamble blocks
+**How to avoid:**
+Switch tsconfig.json to `"module": "nodenext"` and `"moduleResolution": "nodenext"` before publishing. This requires verifying all relative imports in source files use `.js` extensions (e.g., `import { foo } from './bar.js'`). The existing source already uses `.js` extensions in imports (confirmed in `src/index.ts`), so this may be a low-friction change. The existing `"verbatimModuleSyntax": true` setting is already compatible.
 
-**Consequences:** Missing entries silently (domains not blocked), false positives (blocking `localhost`), or parser crashes on unexpected input.
+**Warning signs:**
+- tsconfig.json has `"moduleResolution": "bundler"` (current state)
+- No `"types"` condition in package.json exports map
+- Consumer projects report "could not find declaration file" despite `.d.ts` files being present in the package
 
-**Prevention:**
-1. Strip inline comments (everything after `#`)
-2. Split on any whitespace (`/\s+/`), not just single space
-3. Handle both `\r\n` and `\n` line endings
-4. Skip lines where the domain part is `localhost`, `broadcasthost`, `local`, `0.0.0.0`, `127.0.0.1`, `::1`, or empty
-5. Accept `0.0.0.0`, `127.0.0.1`, and `::1` as valid IP prefixes (or ignore IP entirely and just extract domains)
-6. Handle multi-domain lines by extracting all domain tokens after the IP
-7. Test with real StevenBlack and Hagezi files, not synthetic test data
-
-**Detection:** Unit tests with edge-case lines. Integration test that fetches a real list and asserts entry count is within expected range (StevenBlack unified is ~170k+ entries).
-
-**Phase relevance:** Core parsing phase -- must be right from the start.
+**Phase to address:**
+Package configuration phase (first). Must be fixed before any publish attempt.
 
 ---
 
-### Pitfall 2: Suffix Matching Done Wrong Blocks Too Much or Too Little
+### Pitfall 2: Missing "types" condition in package.json exports map
 
-**What goes wrong:** Naive suffix matching with string `endsWith` causes false positives. Blocking `example.com` with `.endsWith("example.com")` also blocks `notexample.com` because the string ends with `example.com`.
+**What goes wrong:**
+The current package.json has `"exports": { ".": "./dist/index.js" }` with no `"types"` condition. When consumers use `moduleResolution: "node16"` or `"nodenext"`, TypeScript resolves types through the `exports` map. Without an explicit `"types"` entry, TypeScript may fail to find type declarations even though the `.d.ts` files exist adjacent to the `.js` files. The `exports` field takes precedence over top-level `"main"` and `"types"` fields.
 
-**Why it happens:** Domain suffix matching requires label-boundary awareness. `sub.example.com` is a subdomain of `example.com`, but `notexample.com` is a completely different domain. String operations don't understand DNS label boundaries (the dots).
+**Why it happens:**
+Many tutorials show only the top-level `"main"` and `"types"` fields, which work with older `moduleResolution: "node"` but are ignored when `exports` is present and consumers use modern resolution.
 
-**Consequences:** False positives (blocking legitimate domains that happen to share a suffix string) or false negatives (not blocking subdomains because the check is too strict).
+**How to avoid:**
+Add a `"types"` condition to the exports map, and it MUST come first (TypeScript matches the first applicable condition):
+```json
+{
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  }
+}
+```
+Also add top-level `"main"` and `"types"` fields as fallbacks for older tooling:
+```json
+{
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts"
+}
+```
 
-**Prevention:**
-1. When checking if `hostname` is blocked by `blockedDomain`, verify EITHER exact match OR that `hostname` ends with `.` + `blockedDomain`
-2. Normalize: lowercase, strip trailing dot, trim whitespace BEFORE storage and lookup
-3. The correct check: `hostname === blocked || hostname.endsWith("." + blocked)`
-4. If using a Set for O(1) lookup: walk up the domain hierarchy by splitting on dots and checking each ancestor. For `a.b.example.com`, check `a.b.example.com`, then `b.example.com`, then `example.com`, then `com`.
+**Warning signs:**
+- `exports` map has plain string values instead of condition objects
+- No `"types"` key in the exports conditions
+- Consumer projects report "could not find declaration file" errors
 
-**Detection:** Test case: block `example.com`, assert `notexample.com` is NOT blocked, assert `sub.example.com` IS blocked.
-
-**Phase relevance:** Core matching logic -- foundational, must be correct before anything else builds on it.
-
----
-
-### Pitfall 3: Blocking TLDs or Near-TLDs Accidentally
-
-**What goes wrong:** If a blocklist contains entries like `com`, `co.uk`, or `googleapis.com` (which is not a TLD but is extremely broad), suffix matching blocks enormous swaths of the internet.
-
-**Why it happens:** Some community blocklists include overly broad entries. Without guardrails, the library blocks all subdomains of these entries, which can include critical infrastructure domains.
-
-**Consequences:** Agent cannot reach any `.com` domain, or all Google API calls fail, or similar catastrophic over-blocking.
-
-**Prevention:**
-1. Consider a warning/log when a blocklist entry has fewer than 2 labels (e.g., just `com` or `net`)
-2. Document that allow-list overrides exist for exactly this case
-3. The allow-list-first precedence order (`allow > deny > blocklist`) in the project spec already mitigates this -- make sure it is always enforced
-4. Consider optional "safety valve" that warns or skips single-label entries from blocklists
-
-**Detection:** Log a warning count after list ingestion showing how many entries are single-label or two-label. Test that allow-list overrides actually work against broad blocklist entries.
-
-**Phase relevance:** Allow/deny override logic phase. This is why allow-list-first is the right default.
+**Phase to address:**
+Package configuration phase (first).
 
 ---
 
-### Pitfall 4: Memory Explosion with Large Blocklists
+### Pitfall 3: Publishing without a "files" whitelist -- shipping tests, source, and potentially secrets
 
-**What goes wrong:** StevenBlack unified hosts is ~170k entries. Hagezi full is ~300k+. Storing every entry as a full string in a `Set<string>` uses significant memory, and multiple lists compound the problem.
+**What goes wrong:**
+Without a `"files"` field in package.json and without a `.npmignore`, npm falls back to `.gitignore` for exclusion rules. The current `.gitignore` excludes `node_modules/`, `dist/`, and `coverage/`. This means `dist/` (the actual build output consumers need) would be EXCLUDED from the published package, while `src/`, `tests/`, `vitest.config.ts`, `tsconfig.json`, and any future `.env` files would all be INCLUDED. The package would ship source and tests but not the compiled output.
 
-**Why it happens:** Each string in V8 has ~50-80 bytes of overhead beyond the character data. 300k strings averaging 20 characters each: ~300k * ~100 bytes = ~30MB. With multiple lists and no deduplication, this can reach 100MB+.
+**Why it happens:**
+`.gitignore` and npm publishing have opposite needs. You gitignore `dist/` (build artifacts you do not commit) but that is exactly what you want to publish. You want `src/` in git but not in the npm package. First-time publishers do not realize `.gitignore` serves as the default npm exclusion list when no `.npmignore` or `"files"` field exists.
 
-**Consequences:** High memory footprint for a "small library." In constrained environments (serverless, edge workers), this becomes a real problem.
+**How to avoid:**
+Use the `"files"` whitelist in package.json (allowlist approach, safer than `.npmignore` blocklist):
+```json
+{
+  "files": ["dist/"]
+}
+```
+This ensures only `dist/` plus always-included files (package.json, README.md, LICENSE) ships in the tarball. No `.npmignore` needed. The `"files"` approach is the npm-recommended best practice because it is an allowlist -- any new file added to the project is excluded by default unless explicitly added.
 
-**Prevention:**
-1. **Deduplicate across lists.** Use a single `Set<string>` for all blocklist entries, not one per list. This eliminates the ~30-50% overlap between popular lists.
-2. **Use a Set, not a Trie (for v1).** A `Set<string>` with the "walk up the hierarchy" lookup approach is simpler, fast enough (3-4 lookups per check max), and memory-efficient enough for most use cases. A Trie saves memory at extreme scale but adds complexity.
-3. **Stream-parse, don't load entire file into memory.** Process the response body line-by-line (or split by newline after download) rather than building an intermediate array of all lines.
-4. **Track and log entry counts** so users know what they're loading.
+Always run `npm pack --dry-run` to verify contents before publishing.
 
-**Detection:** Benchmark memory usage with `process.memoryUsage()` before and after loading StevenBlack unified. If delta exceeds 50MB, investigate.
+**Warning signs:**
+- No `"files"` field in package.json (current state)
+- No `.npmignore` file (current state)
+- `npm pack --dry-run` shows test files, config files, or source in the tarball
+- Package size is unexpectedly large (megabytes instead of kilobytes)
 
-**Phase relevance:** Blocklist ingestion phase. Design the data structure correctly from the start; changing it later requires touching every lookup path.
-
----
-
-### Pitfall 5: Fetch Failures That Silently Break the Firewall
-
-**What goes wrong:** Blocklist URL returns 404, times out, or returns HTML error page instead of a hosts file. The library either crashes, blocks nothing (empty list), or parses the HTML and gets garbage entries.
-
-**Why it happens:** Community blocklist URLs move, GitHub raw URLs change, CDNs have outages. HTTP responses don't always fail cleanly -- a 200 with a Cloudflare challenge page or a redirect to a login page returns HTML that the parser tries to interpret as hosts entries.
-
-**Consequences:** Silent failure = the firewall is "running" but blocking nothing. Or worse, HTML tags get parsed as domains and the firewall blocks random strings.
-
-**Prevention:**
-1. **Validate response content-type** or at minimum check that the first non-comment line looks like a hosts/domains entry
-2. **Log clearly** when a source fails, including HTTP status and URL
-3. **Never throw from `isDomainBlocked`** -- spec already requires this, enforce with tests
-4. **Require at least one source to succeed** during `start()`, or emit a warning that the firewall has zero entries
-5. **Set reasonable timeouts** on fetch (10-15 seconds per source)
-6. **On refresh failure, keep the previous good data** rather than clearing the blocklist
-
-**Detection:** Test with intentionally broken URLs. Assert that `isDomainBlocked` still works (returns not-blocked). Assert that a warning/error is logged.
-
-**Phase relevance:** Blocklist fetching phase. The "graceful failure" requirement in the spec is good -- make sure it's tested thoroughly.
+**Phase to address:**
+Package configuration phase (first).
 
 ---
 
-### Pitfall 6: Refresh Race Conditions
+### Pitfall 4: No build step before publish -- stale or missing dist/
 
-**What goes wrong:** During a periodic refresh, the old blocklist data is cleared before the new data is fully loaded. For the duration of the fetch+parse (could be several seconds), `isDomainBlocked` returns "not blocked" for everything.
+**What goes wrong:**
+Running `npm publish` without running `npm run build` first publishes stale or missing `dist/` contents. Since `dist/` is gitignored, a fresh clone (as in CI) has no `dist/` directory at all, resulting in an empty or broken package.
 
-**Why it happens:** Naive implementation: `this.blocklist.clear(); await this.loadSources(); // gap here where blocklist is empty`
+**Why it happens:**
+Locally, developers often have a `dist/` directory from previous builds. They test, it works, they publish -- not realizing `dist/` contains stale output. In CI, the problem is worse: `dist/` does not exist unless the workflow explicitly runs a build step.
 
-**Consequences:** Window of vulnerability during every refresh cycle. If refresh is frequent (e.g., every 30 minutes) and fetches are slow, this creates regular security gaps.
+**How to avoid:**
+Add a `"prepublishOnly"` lifecycle script to package.json:
+```json
+{
+  "scripts": {
+    "prepublishOnly": "npm run build && npm test"
+  }
+}
+```
+This runs build + test automatically before every publish attempt (both local and CI). In the CI workflow, also add an explicit build step -- do not rely solely on lifecycle scripts.
 
-**Prevention:**
-1. **Build new Set, then swap atomically.** Load all sources into a NEW `Set<string>`, then replace the reference: `this.blocklist = newBlocklist`. The old set is garbage-collected.
-2. **If any source fails during refresh, merge successful results with existing data** rather than replacing entirely. Or keep the old data entirely if all sources fail.
-3. **Never mutate the active blocklist in place during refresh.**
+**Warning signs:**
+- No `prepublishOnly` script in package.json (current state)
+- CI workflow has a publish step but no preceding build step
+- `npm pack --dry-run` shows no `.js` files or only stale files in `dist/`
 
-**Detection:** Test: start firewall, verify domain is blocked, trigger refresh (with a slow/delayed mock source), verify domain is STILL blocked during the refresh.
-
-**Phase relevance:** Refresh/lifecycle phase. This is easy to get wrong and hard to notice in testing because the window is brief.
-
----
-
-## Moderate Pitfalls
-
-### Pitfall 7: Not Normalizing Domains Consistently
-
-**What goes wrong:** Domain stored as `Example.COM` in the blocklist, but lookup checks `example.com`. Or trailing dots: `example.com.` vs `example.com`. Mismatch means the domain is not found.
-
-**Prevention:**
-1. Normalize at TWO points: when adding to the blocklist AND when checking `isDomainBlocked`
-2. Normalization: `hostname.toLowerCase().trim().replace(/\.$/, "")`
-3. Write a single `normalizeDomain()` function used by both ingestion and lookup paths
-4. Test with mixed-case input on both sides
-
-**Phase relevance:** Core parsing phase. Create the normalize function first and use it everywhere.
+**Phase to address:**
+Package configuration phase (prepublishOnly script) and CI/CD pipeline phase (explicit workflow step).
 
 ---
 
-### Pitfall 8: Timer Leaks on Stop/Cleanup
+### Pitfall 5: npm token with excessive scope and no expiration
 
-**What goes wrong:** `setInterval` for refresh is started but never cleared when `stop()` is called. In test environments or short-lived processes, this keeps the process alive and leaks resources.
+**What goes wrong:**
+Using a classic npm automation token gives CI/CD full write access to every package on the account. If the token leaks through logs, a compromised dependency, or a supply chain attack on a GitHub Action, an attacker can publish malicious versions of any package you maintain.
 
-**Prevention:**
-1. Store the interval ID from `setInterval` and call `clearInterval` in `stop()`
-2. Use `unref()` on the timer so it doesn't keep the Node.js event loop alive: `timer.unref()`
-3. Make `stop()` idempotent -- calling it twice should not throw
-4. Cancel any in-flight fetch requests during `stop()` using `AbortController`
+**Why it happens:**
+Classic tokens are the simplest to set up. Many tutorials still show them. Granular tokens and trusted publishing (OIDC) are newer.
 
-**Detection:** Test: call `start()`, then `stop()`, verify the process can exit cleanly (no hanging timer). Vitest/Jest will warn about open handles.
+**How to avoid:**
+Use npm trusted publishing (OIDC) with GitHub Actions. This eliminates long-lived tokens entirely. The workflow uses short-lived, cryptographically-signed tokens specific to the workflow run that cannot be extracted or reused.
 
-**Phase relevance:** Lifecycle/API phase. Easy to forget `unref()` specifically.
+Configuration requires:
+1. Link the GitHub repository to the npm package in npm's web UI under "Trusted Publishers"
+2. Set `id-token: write` permission in the GitHub Actions workflow
+3. Use `provenance: true` in the publish step
 
----
+If OIDC is not viable, use a granular access token scoped to only the `agent-dns-firewall` package with write permissions and a short expiration (90 days max).
 
-### Pitfall 9: Unsafe Domain Names in Input
+**Warning signs:**
+- NPM_TOKEN secret is a classic automation token
+- Token has no expiration date
+- Token grants access to all packages, not just this one
+- No provenance attestation on published versions
 
-**What goes wrong:** `isDomainBlocked()` receives unexpected input -- a full URL (`https://example.com/path`), an IP address, `null`, `undefined`, an empty string, or a domain with a port (`example.com:8080`).
-
-**Prevention:**
-1. Document clearly that the input is a hostname, not a URL
-2. Defensively strip protocol, path, port if present -- or throw a clear error
-3. Handle `null`/`undefined`/empty gracefully (return "not blocked" per the no-throw requirement)
-4. Consider a lightweight validation: hostname should match `/^[a-z0-9.-]+$/i` after normalization
-
-**Detection:** Test with URLs, IPs, empty strings, null, undefined. All should return a valid `BlockDecision` without throwing.
-
-**Phase relevance:** Public API design phase. Define the contract early.
+**Phase to address:**
+CI/CD pipeline phase.
 
 ---
 
-### Pitfall 10: Ignoring the `domains` Format Differences
+### Pitfall 6: Pre-release versions tagged as "latest"
 
-**What goes wrong:** The project supports both `hosts` format and `domains` format (plain domain list). Using the same parser for both fails because domains format has no IP prefix.
+**What goes wrong:**
+Running `npm publish` for a version like `1.1.0-beta.1` tags it as `latest` by default. Anyone running `npm install agent-dns-firewall` gets the pre-release. npm does NOT auto-detect pre-release version strings.
 
-**Prevention:**
-1. Require the user to specify the format per source in config (`format: "hosts" | "domains"`)
-2. The `hosts` parser extracts domains after the IP prefix; the `domains` parser treats each non-comment line as a domain
-3. Do NOT try to auto-detect format -- it's ambiguous (a valid domain like `127.0.0.1.example.com` looks like a hosts line)
-4. The presets should encode the correct format for each known list
+**Why it happens:**
+npm always applies the `latest` dist-tag unless you explicitly specify a different tag. This is a known, longstanding behavior that catches most first-time publishers.
 
-**Detection:** Test both formats with real-world examples. Test that a domains-format file parsed as hosts-format produces incorrect results (this validates that format matters).
+**How to avoid:**
+Always use `--tag` for pre-release publishes:
+```bash
+npm publish --tag beta    # or --tag next
+```
+In CI/CD, add logic to detect pre-release versions (presence of `-` in the version string) and automatically apply a non-latest tag. When ready for the stable release, publish without `--tag` so it gets `latest` naturally.
 
-**Phase relevance:** Blocklist ingestion phase. Bake format into the source config type from the start.
+**Warning signs:**
+- Version string contains `-` (alpha, beta, rc) but publish command has no `--tag` flag
+- `npm info agent-dns-firewall dist-tags` shows a pre-release as `latest`
 
----
-
-## Minor Pitfalls
-
-### Pitfall 11: Not Handling IDN / Punycode Domains
-
-**What goes wrong:** International domain names (e.g., `xn--nxasmq6b.com` or `unicodedomain.com`) appear in some blocklists in punycode form. If the lookup uses the unicode form (or vice versa), there's a mismatch.
-
-**Prevention:** For v1, document that domains should be in ASCII/punycode form. Hosts files universally use punycode. If supporting unicode lookup, convert to punycode before checking. Node.js has `url.domainToASCII()` built-in (no dependency needed).
-
-**Phase relevance:** Future enhancement. Not critical for v1 but worth documenting.
+**Phase to address:**
+CI/CD pipeline phase. Build tag detection into the GitHub Actions workflow.
 
 ---
 
-### Pitfall 12: Preset URLs Going Stale
+### Pitfall 7: Not testing the packaged artifact as a consumer would install it
 
-**What goes wrong:** Hardcoded preset URLs (StevenBlack GitHub raw URL, Hagezi GitHub raw URL) change when repositories restructure or maintainers change hosting.
+**What goes wrong:**
+The package publishes, types appear to resolve, but when a consumer imports it, runtime errors occur. Common causes: the `exports` map points to a wrong file path, the entry point has a broken transitive import, or a file is missing from the tarball. Unit tests pass because they import from source (`../src/`) and never exercise the packaged artifact.
 
-**Prevention:**
-1. Use the most stable URLs available (GitHub raw URLs based on `master`/`main` branch, not tagged releases that may stop updating)
-2. Document the preset URLs in the README so users can verify
-3. Allow users to override preset URLs in config
-4. The graceful-failure design means a stale URL degrades to "no entries from that source" rather than crashing
+**Why it happens:**
+Testing from the source tree exercises different module resolution paths than installing from a tarball. Import paths, file presence, and `exports` map resolution all differ between development and consumption.
 
-**Phase relevance:** Preset configuration phase. Keep preset definitions separate from core logic so they're easy to update.
+**How to avoid:**
+Add a smoke test step that tests the packaged artifact:
+```bash
+# In CI, after build:
+npm pack
+mkdir /tmp/smoke && cd /tmp/smoke
+npm init -y && echo '{"type":"module"}' > package.json
+npm install /path/to/agent-dns-firewall-*.tgz
+node -e "import('agent-dns-firewall').then(m => { if (!m.createDomainFirewall) process.exit(1) })"
+# Also verify types resolve:
+npx tsc --noEmit --moduleResolution nodenext test-types.ts
+```
+
+**Warning signs:**
+- No integration/smoke test that installs the package from its tarball
+- All tests import from `../src/` paths
+- CI passes but first user reports "cannot find module"
+
+**Phase to address:**
+CI/CD pipeline phase. Add a smoke test job that runs after build but before publish.
 
 ---
 
-### Pitfall 13: Not Testing with Real Lists
+## Technical Debt Patterns
 
-**What goes wrong:** All tests use small synthetic data. The parser works perfectly on `0.0.0.0 test.com` but breaks on line 47,382 of StevenBlack's actual file due to an unexpected format variation.
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| Skip smoke test, rely on unit tests only | Faster CI, simpler setup | Broken packages reach npm, erodes user trust | Never for published packages |
+| Use classic npm token instead of OIDC | 5 min faster initial setup | Full account compromise risk if token leaks | Never -- OIDC is a one-time setup cost |
+| Keep `moduleResolution: "bundler"` | No import path changes needed | Breaks type resolution for Node.js consumers | Never for published libraries |
+| Skip `prepublishOnly` script | Less configuration | Stale or empty builds published accidentally | Never |
+| Manual version bumps with no automation | No tooling to learn | Forgotten bumps, duplicate version attempts, tag mismatches | Acceptable for first few releases; automate once cadence is established |
+| `declarationMap: true` without shipping `src/` | Better IDE go-to-definition locally | Source maps in `.d.ts.map` reference `src/` files not in the package; consumers get broken "go to definition" that opens empty files | Acceptable if you include `src/` in `"files"`, otherwise disable declarationMap |
 
-**Prevention:**
-1. Have at least one integration test (possibly marked slow/optional) that fetches a real list and validates parsing
-2. Keep a small snapshot of real-world edge-case lines as a test fixture
-3. Test that entry count after parsing is within a reasonable range of expected (StevenBlack unified: ~130k-200k entries)
+## Integration Gotchas
 
-**Phase relevance:** Testing phase. Create a fixture file with real edge-case lines early.
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| npm registry (first publish) | Forgetting `--access public` on a scoped package; for unscoped packages this is not needed but good to know | If the package is ever scoped (`@scope/name`), first publish requires `--access public` |
+| npm registry (provenance) | Publishing without `--provenance` flag -- no supply chain verification for consumers | Use `provenance: true` in GitHub Actions publish step; requires `id-token: write` permission |
+| GitHub Actions (token) | Storing NPM_TOKEN as repository secret with classic token, no expiration | Use npm trusted publishing (OIDC) or granular token with expiration and single-package scope |
+| GitHub Actions (trigger) | Triggering publish on every push to main | Trigger publish only on GitHub Release creation or version tags (`v*`) |
+| GitHub Actions (supply chain) | Using actions with mutable tags (`actions/setup-node@v4`) | Pin actions to full commit SHA for supply chain security |
+| GitHub Actions (permissions) | Using default `GITHUB_TOKEN` permissions (too broad) | Set `permissions:` explicitly in workflow, only grant what is needed |
+| npm registry (README) | README not present in tarball or shows development instructions instead of install/usage | npm renders README.md as the package page; ensure it leads with `npm install` and quick start |
 
----
+## Security Mistakes
 
-## Phase-Specific Warnings
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| `.env` or config files included in published package | API keys, credentials exposed to every npm user; irreversibly public within seconds across thousands of registry mirrors | Use `"files"` whitelist in package.json; run `npm pack --dry-run` before every publish |
+| npm token printed in CI logs | Token visible in GitHub Actions logs, harvestable by anyone with repo read access | Use OIDC trusted publishing; never `echo` or log token values; npm CLI redacts by default but custom scripts may not |
+| No 2FA on npm account | Account takeover leads to malicious package versions pushed to all consumers | Enable 2FA on npm account; use automation/granular tokens for CI that bypass the 2FA prompt |
+| Publishing from a developer machine instead of CI | Inconsistent builds, risk of local-only files leaking, no audit trail | Publish exclusively from CI/CD; use npm trusted publishing which only works from designated CI environments |
+| `node_modules/` somehow included in tarball | Massive package size, potential transitive credential files exposed | `"files"` whitelist prevents this entirely; `npm pack --dry-run` catches it |
 
-| Phase Topic | Likely Pitfall | Mitigation |
-|-------------|---------------|------------|
-| Hosts/domains parsing | Format variations, CR/LF, inline comments, multi-domain lines (Pitfalls 1, 10) | Robust parser with comprehensive test fixtures from real lists |
-| Domain matching | Suffix false positives on label boundaries (Pitfall 2) | `exact || endsWith("." + blocked)` pattern, explicit test for `notexample.com` |
-| Data structure | Memory with large lists (Pitfall 4) | Single deduplicated Set, benchmark memory with real lists |
-| Allow/deny logic | TLD/broad-entry over-blocking (Pitfall 3) | Allow-first precedence, warnings on single-label entries |
-| Blocklist fetching | Silent failures, HTML error pages (Pitfall 5) | Content validation, keep-previous-on-failure, timeout, logging |
-| Refresh lifecycle | Race condition during swap (Pitfall 6), timer leaks (Pitfall 8) | Atomic swap pattern, `unref()` on timers, `AbortController` on stop |
-| Public API | Unexpected input types (Pitfall 9) | Defensive normalization, no-throw contract, input validation |
-| Presets | Stale URLs (Pitfall 12) | Graceful failure, user-overridable URLs |
+## UX Pitfalls
+
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| No `"description"`, `"keywords"`, `"repository"` in package.json | Package is hard to find on npm search, no link to source code | Fill in all metadata fields before first publish; `"repository"` enables npm's "GitHub" link |
+| No `"engines"` field specifying Node >= 18 | Users on Node 16 install the package, get cryptic ESM errors at runtime | Add `"engines": { "node": ">=18" }` to package.json |
+| Missing `"homepage"` field | npm package page has no link to documentation | Set `"homepage"` to the GitHub repo or a docs URL |
+| No CHANGELOG between versions | Users cannot determine what changed; must read commit history | Maintain CHANGELOG.md or use GitHub Releases (npm links to them if `"repository"` is set) |
+| Version still at 0.1.0 for a stable library | Signals instability; SemVer says 0.x means "anything may change at any time" | The library shipped v1.0 milestone; first npm publish should be `1.0.0` to signal stability |
+| `declarationMap` source maps point to missing `src/` | Consumers click "Go to Definition" in their IDE and get an empty file or error | Either include `src/` in `"files"` or set `declarationMap: false` in tsconfig for the publish build |
+
+## "Looks Done But Isn't" Checklist
+
+- [ ] **exports map:** Has `"."` entry but missing `"types"` condition -- verify TypeScript consumers can resolve types with `moduleResolution: "nodenext"`
+- [ ] **"files" whitelist:** Field exists but does not include `dist/` -- run `npm pack --dry-run` and confirm `.js` and `.d.ts` files are present, and test/source files are absent
+- [ ] **prepublishOnly:** Script runs `build` but not `test` -- ensure both run: `"prepublishOnly": "npm run build && npm test"`
+- [ ] **CI workflow ordering:** Build step exists but runs after publish step -- verify correct sequence: checkout, install, build, test, smoke test, publish
+- [ ] **Type declarations:** `.d.ts` files exist in `dist/` but `declarationMap` source maps reference `src/` files not in the package -- either ship `src/` or disable `declarationMap`
+- [ ] **README:** Has development docs but install command says "clone this repo" instead of `npm install agent-dns-firewall`
+- [ ] **Version number:** Still at `0.1.0` -- first npm publish should use a version that signals the library's actual maturity
+- [ ] **package.json "type":** Must remain `"module"` for ESM -- verify it is not accidentally removed during metadata edits
+- [ ] **LICENSE file:** Must exist in project root (already present) -- `"files"` whitelist does not need to list it; npm always includes it
+- [ ] **Provenance:** CI workflow uses `provenance: true` and `id-token: write` -- verify on first publish that npm shows "published with provenance"
+
+## Recovery Strategies
+
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| Published with broken types | MEDIUM | Publish a patch version with corrected exports map; cannot unpublish after 72 hours |
+| Published with missing dist/ files | MEDIUM | Publish a patch version with correct `"files"` field; old broken version remains on registry forever |
+| Published secrets in package | HIGH | Immediately rotate ALL exposed credentials; `npm unpublish` within 72 hours if possible; contact npm support after 72 hours; assume credentials are permanently compromised regardless of unpublish success |
+| Pre-release tagged as "latest" | LOW | Run `npm dist-tag add agent-dns-firewall@<stable-version> latest` to redirect latest to the correct stable version |
+| Published wrong version number | LOW | Cannot reuse a version number once published; publish the next patch with correct content and deprecate the bad version with `npm deprecate` |
+| npm token compromised | HIGH | Revoke token immediately in npm settings; audit recent publishes with `npm info agent-dns-firewall` for unexpected versions; rotate to OIDC trusted publishing |
+
+## Pitfall-to-Phase Mapping
+
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| moduleResolution "bundler" (Pitfall 1) | Package configuration | `tsc` compiles successfully with `module: "nodenext"`; smoke test confirms type resolution |
+| Missing "types" in exports (Pitfall 2) | Package configuration | Consumer test file compiles with `moduleResolution: "nodenext"` |
+| No "files" whitelist (Pitfall 3) | Package configuration | `npm pack --dry-run` output shows only dist/, README.md, LICENSE, package.json |
+| No build before publish (Pitfall 4) | Package config + CI/CD | `prepublishOnly` script exists; CI workflow has explicit build step before publish |
+| npm token security (Pitfall 5) | CI/CD pipeline | OIDC trusted publishing configured; no long-lived secrets stored |
+| Pre-release tag issue (Pitfall 6) | CI/CD pipeline | Workflow detects `-` in version string and applies non-latest dist-tag |
+| No smoke test (Pitfall 7) | CI/CD pipeline | CI job installs tarball in clean directory, imports package, verifies types resolve |
+| Missing package.json metadata | Package configuration | All metadata fields populated: description, keywords, repository, engines, homepage |
+| declarationMap broken references | Package configuration | Either `src/` included in files or `declarationMap` disabled |
+| Version number decision | Package configuration | Version set to `1.0.0` (or appropriate semver) before first publish |
 
 ## Sources
 
-- Training data knowledge of hosts file format conventions (StevenBlack, Hagezi, Pi-hole ecosystem) -- MEDIUM confidence
-- Project requirements from `.planning/PROJECT.md`
-- Domain expertise in DNS blocking semantics, Set vs Trie tradeoffs, V8 string memory overhead
-- Note: Web search and web fetch tools were unavailable; findings based on training data. Recommend validating real list formats during implementation.
+- [npm official blog: Publishing what you mean to publish](https://blog.npmjs.org/post/165769683050/publishing-what-you-mean-to-publish.html) -- files/ignores behavior
+- [npm Files & Ignores wiki](https://github.com/npm/cli/wiki/Files-&-Ignores) -- authoritative rules for file inclusion/exclusion
+- [TypeScript Publishing documentation](https://www.typescriptlang.org/docs/handbook/declaration-files/publishing.html) -- official guidance on types in packages
+- [Andrew Branch: Is nodenext right for libraries?](https://blog.andrewbran.ch/is-nodenext-right-for-libraries-that-dont-target-node-js/) -- why nodenext over bundler for published libraries
+- [2ality: Publishing ESM-based npm packages with TypeScript](https://2ality.com/2025/02/typescript-esm-packages.html) -- comprehensive ESM publishing guide
+- [npm Trusted Publishing docs](https://docs.npmjs.com/trusted-publishers/) -- OIDC-based publishing without long-lived tokens
+- [Liran Tal: Avoiding secret leaks to npm](https://dev.to/lirantal/how-to-avoid-leaking-secrets-to-the-npm-registry-2jip) -- prevention strategies
+- [npm CLI issue #7553: Pre-release tagged as latest](https://github.com/npm/cli/issues/7553) -- longstanding default behavior
+- [Snyk: Best practices for modern npm packages](https://snyk.io/blog/best-practices-create-modern-npm-package/) -- security and configuration practices
+- [GitHub changelog: npm token security changes](https://github.blog/changelog/2025-09-29-strengthening-npm-security-important-changes-to-authentication-and-token-management/) -- granular token requirements
+- [Tim Kadlec on automatic npm publishing with granular tokens](https://httptoolkit.com/blog/automatic-npm-publish-gha/) -- GitHub Actions CI/CD setup
+
+---
+*Pitfalls research for: TypeScript ESM npm publishing (v1.1 milestone)*
+*Researched: 2026-03-08*

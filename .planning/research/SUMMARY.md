@@ -1,165 +1,150 @@
 # Project Research Summary
 
 **Project:** agent-dns-firewall
-**Domain:** In-process DNS blocklist / hostname egress guard for AI agents
+**Domain:** npm package publishing for existing TypeScript ESM library
 **Researched:** 2026-03-08
-**Confidence:** MEDIUM
+**Confidence:** HIGH
 
 ## Executive Summary
 
-This project is an in-process domain firewall library -- not a DNS server, not a proxy, not a browser extension. It answers one question: "should this hostname be blocked?" Experts in this space (Pi-hole, AdGuard Home, uBlock Origin) all follow the same fundamental pipeline: fetch blocklists, parse them, normalize domains, index them in a fast-lookup structure, and check queries against that index with allow/deny overrides. The key architectural insight is that ingestion is slow and infrequent while lookup is fast and frequent -- all design decisions flow from this asymmetry.
+This milestone wraps an already-complete TypeScript ESM library (v1.0, 120 tests, 9 source files) with npm publishing infrastructure. The library code and build system are unchanged. The work is entirely configuration and CI/CD: updating package.json metadata, fixing tsconfig moduleResolution for consumers, adding GitHub Actions workflows, and setting up OIDC trusted publishing. Experts treat this as a "packaging" milestone -- no application logic, just ensuring the artifact is correctly shaped for the npm ecosystem.
 
-The recommended approach is to build a zero-runtime-dependency TypeScript library using a `Set<string>` with suffix walking for domain matching. This is simpler than a trie, fast enough for the target scale of 150K-200K domains (sub-millisecond lookups), and avoids premature optimization. The library uses a factory pattern (`createDomainFirewall()`) that returns an independent instance with a clean start/stop lifecycle. Dev tooling is minimal: TypeScript, tsup for building, vitest for testing, Biome for linting. The entire runtime ships with zero `node_modules`.
+The recommended approach is straightforward: fix package.json exports to include a `types` condition, switch tsconfig from `moduleResolution: "bundler"` to `"nodenext"`, add a `files` whitelist, install publint and @arethetypeswrong/cli for validation, create two GitHub Actions workflows (CI and publish), and configure npm OIDC trusted publishing. The entire stack is plain tsc with zero new runtime dependencies and only two new dev dependencies for validation.
 
-The primary risks are: (1) hosts file parsing is messier than it looks -- real-world files contain inline comments, mixed line endings, multi-domain lines, and special entries that naive parsers miss; (2) suffix matching done wrong blocks too much or too little (the `endsWith` trap); (3) refresh race conditions can create windows where the firewall blocks nothing. All three are well-understood problems with known solutions documented in the pitfalls research. The mitigation strategy is to build from the inside out -- get normalization, parsing, and matching rock-solid with comprehensive tests before adding I/O, lifecycle, and refresh logic.
+The primary risks are shipping broken type declarations (the current `bundler` moduleResolution silently produces `.d.ts` files incompatible with Node.js consumers) and accidentally publishing source/secrets (no `files` whitelist exists today). Both are preventable with configuration changes in Phase 1 and verification via publint, attw, and `npm pack --dry-run`. A secondary risk is the OIDC trusted publishing first-publish chicken-and-egg: the initial publish must be done manually with a short-lived granular token before OIDC can be configured.
 
 ## Key Findings
 
 ### Recommended Stack
 
-Zero runtime dependencies is the defining constraint. The entire stack is dev tooling. TypeScript with strict mode provides type safety for domain-handling edge cases. tsup bundles to a single ESM entry point with `.d.ts` generation. vitest handles testing with native ESM and TypeScript support (no Jest ESM pain). Biome replaces ESLint + Prettier as a single lint/format tool.
+The existing stack (TypeScript 5.9, Vitest 4.0, Node 18+, ESM-only, tsc build) is unchanged. Two dev dependencies are added for publish validation. No bundler, no semantic-release, no CJS output.
 
-**Core technologies:**
-- **TypeScript ~5.7**: Type safety and API contracts -- strict mode catches domain-handling bugs at compile time
-- **Node.js >=18**: Global `fetch()`, `AbortController`, stable ESM -- no polyfills needed
-- **tsup ~8.x**: Single-command ESM library bundling with `.d.ts` generation
-- **vitest ~3.x**: Native ESM + TypeScript testing, no configuration pain
-- **Biome ~1.9+**: Lint + format in one Rust binary, replaces ESLint + Prettier
-- **Set<string> with suffix walking**: Domain index -- O(1) hash lookups, 5-7 label walks per query max
+**Core technologies (new for this milestone):**
+- **publint ^0.3**: validates package.json exports/types/files match actual build output -- catches misconfigurations before they reach consumers
+- **@arethetypeswrong/cli ^0.17**: validates TypeScript type resolution across all moduleResolution modes -- the only tool that catches the bundler-vs-nodenext `.d.ts` issue
+- **GitHub Actions (OIDC trusted publishing)**: eliminates long-lived npm tokens entirely; classic tokens were revoked Dec 2025, granular tokens expire in 90 days max
+
+**Critical tsconfig change:** Switch `module` and `moduleResolution` from `"ES2022"`/`"bundler"` to `"NodeNext"`/`"NodeNext"`. All source imports already use `.js` extensions, so zero code changes required.
 
 ### Expected Features
 
 **Must have (table stakes):**
-- Hosts-format and domain-list parsing (covers StevenBlack and Hagezi, the two dominant list formats)
-- Remote list fetching via HTTP/HTTPS
-- Exact match and suffix/subdomain matching
-- Allow list and deny list overrides with correct precedence (allow > deny > blocklist)
-- Hostname normalization (lowercase, trim, strip trailing dot)
-- Graceful failure on bad sources (never crash, degrade to allow-all)
-- Structured block decision return value (`{ blocked, reason, source }`)
-- Programmatic start/stop lifecycle
+- `exports` map with `types` condition (TypeScript consumers with `moduleResolution: "nodenext"` cannot find types without it)
+- `files` whitelist (`["dist"]`) to control published contents
+- `engines`, `keywords`, `repository`, `homepage`, `bugs`, `author` metadata
+- Version bumped to `1.0.0` (signals stability; library is production-ready)
+- `prepublishOnly` script (build + test gate before any publish)
+- GitHub Actions CI workflow (test matrix across Node 18, 20, 22)
+- GitHub Actions publish workflow (tag-triggered, OIDC, provenance)
+- `sideEffects: false` (enables tree-shaking for consumers who bundle)
 
 **Should have (differentiators):**
-- Periodic refresh with configurable interval
-- Built-in presets for popular lists (zero-config experience)
-- Multiple concurrent list sources
-- Event/callback on block decisions
+- publint + attw validation in CI (catches broken packages before they ship)
+- npm provenance badge (supply chain verification visible on npmjs.com)
+- Source maps and declaration maps shipped (better debugging/IDE experience for consumers)
 
 **Defer (v2+):**
-- Adblock-filter-list format parsing (`||domain^` syntax)
-- Wildcard/glob patterns in allow/deny lists
-- ETag/If-Modified-Since conditional refresh
-- Local file source support
-- Response caching with TTL
-- CIDR/IP-based blocking
+- Automated release tooling (semantic-release/changesets) -- overkill for single maintainer
+- Multiple entry points / subpath exports -- only if API surface grows
+- CHANGELOG.md -- becomes useful after multiple releases
 
 ### Architecture Approach
 
-The architecture follows the universal DNS blocklist pipeline: fetch, parse, normalize, index, lookup -- with allow/deny overrides checked before the blocklist. Components are cleanly separated into single-file modules with a DAG dependency graph. The factory pattern (`createDomainFirewall()`) creates closures with no shared mutable state, enabling multiple independent instances. The atomic swap pattern on refresh (build new Set, replace reference) eliminates race conditions without locks.
+The architecture is a CI/CD pipeline wrapping the existing build. Two workflow files (ci.yml and publish.yml) sit alongside package.json metadata changes. The publish pipeline follows a strict sequence: checkout, install, build, test, validate, publish. OIDC trusted publishing replaces stored secrets. The `files` field ensures only `dist/` ships to npm.
 
 **Major components:**
-1. **Domain Normalizer** -- lowercase, trim, strip trailing dot, validate hostname shape; used by both ingestion and lookup
-2. **List Parser** -- format-aware parsing (hosts-format and domains-format) into domain arrays
-3. **Domain Index** -- `Set<string>` storing all blocked domains with suffix walking for subdomain matching
-4. **Lookup Engine** -- orchestrates precedence chain: allow > deny > blocklist > not-blocked
-5. **List Fetcher** -- HTTP(S) download with error handling, timeouts, content validation
-6. **Factory** -- wires components, manages lifecycle (start/stop), owns the refresh scheduler
-7. **Presets** -- named config objects with pre-filled URLs for popular lists
+1. **Package metadata** (package.json) -- exports, types, files, engines, repository fields that control how npm and TypeScript consumers resolve the package
+2. **CI workflow** (ci.yml) -- test + build on every push/PR across Node 18/20/22 matrix
+3. **Publish workflow** (publish.yml) -- tag-triggered build + test + validate + publish with OIDC and provenance
+4. **npm trusted publisher config** -- one-time setup on npmjs.com linking GitHub repo to package
 
 ### Critical Pitfalls
 
-1. **Hosts file format is messier than expected** -- real files have inline comments, `\r\n` mixed with `\n`, tabs as separators, multi-domain lines, and special entries like `localhost`. Prevention: split on any whitespace, strip inline comments, handle both line ending styles, skip special entries, test with real StevenBlack/Hagezi files.
-
-2. **Suffix matching false positives** -- `"notexample.com".endsWith("example.com")` is true but `notexample.com` is not a subdomain of `example.com`. Prevention: check exact match OR `hostname.endsWith("." + blocked)`. Always verify at label boundaries.
-
-3. **Refresh race conditions** -- clearing the blocklist before new data loads creates a vulnerability window. Prevention: build a new Set, then atomically swap the reference. Never mutate the active blocklist during refresh.
-
-4. **Silent fetch failures** -- a 200 response with an HTML error page gets parsed as garbage domain entries. Prevention: validate response content, log failures clearly, keep previous good data on refresh failure, set fetch timeouts.
-
-5. **Timer leaks on stop** -- `setInterval` for refresh keeps the process alive after `stop()`. Prevention: store interval ID, `clearInterval` in `stop()`, call `.unref()` on the timer, cancel in-flight fetches with `AbortController`.
+1. **`moduleResolution: "bundler"` breaks consumer type resolution** -- switch to `"nodenext"` before publishing; all source imports already use `.js` extensions so no code changes needed
+2. **Missing `types` condition in exports map** -- add `"types": "./dist/index.d.ts"` as the FIRST condition in exports; without it, TypeScript consumers using modern resolution cannot find types
+3. **No `files` whitelist ships tests/source/secrets** -- current `.gitignore` would EXCLUDE `dist/` and INCLUDE `src/` and `tests/`; add `"files": ["dist"]` immediately
+4. **Stale or missing `dist/` at publish time** -- add `prepublishOnly` script; CI must have explicit build step before publish
+5. **Pre-release versions tagged as `latest`** -- use `--tag beta` for pre-release publishes; build version detection into CI workflow
+6. **`declarationMap` references missing `src/`** -- either include `src/` in `files` or disable `declarationMap`; currently source maps will point to files not in the package
 
 ## Implications for Roadmap
 
 Based on research, suggested phase structure:
 
-### Phase 1: Core Data Structures and Matching
+### Phase 1: Package Configuration
 
-**Rationale:** Everything depends on correct normalization and matching. These are pure functions with no I/O -- easiest to build, test, and get right. Both ARCHITECTURE.md and FEATURES.md identify normalization as foundational.
-**Delivers:** Domain normalizer, hosts-format parser, domains-format parser, Set-based domain index with suffix matching, TypeScript types (`BlockDecision`, `FirewallConfig`, `Source`)
-**Addresses:** Hostname normalization, hosts-format parsing, domain-list parsing, exact match lookup, suffix/subdomain matching
-**Avoids:** Pitfall 1 (messy hosts format), Pitfall 2 (suffix false positives), Pitfall 7 (inconsistent normalization), Pitfall 10 (format differences)
+**Rationale:** All other phases depend on correct package.json and tsconfig. This is the foundation that must be right before any publish attempt. Every critical pitfall (1-4) is addressed here.
+**Delivers:** A correctly configured package that passes publint and attw validation, and produces the right tarball contents.
+**Addresses:** All table-stakes features (exports with types, files whitelist, metadata fields, version bump, sideEffects, prepublishOnly script). Install publint and attw as dev dependencies.
+**Avoids:** Pitfalls 1 (bundler moduleResolution), 2 (missing types condition), 3 (no files whitelist), 4 (no build before publish).
+**Includes:** tsconfig changes (module/moduleResolution to NodeNext), declarationMap decision, `npm pack --dry-run` verification.
 
-### Phase 2: Lookup Engine and Override Logic
+### Phase 2: CI/CD Pipeline
 
-**Rationale:** The lookup engine is the core value proposition. It depends on the domain index from Phase 1. Allow/deny overrides make the library usable in production (false positives are inevitable without allow lists).
-**Delivers:** Lookup engine with precedence chain, allow list and deny list support, structured block decision return values
-**Addresses:** Allow/deny list overrides, correct precedence order, structured block decision
-**Avoids:** Pitfall 3 (TLD over-blocking -- allow-first precedence is the mitigation), Pitfall 9 (unsafe input -- define the no-throw contract here)
+**Rationale:** With package configuration correct, the CI/CD pipeline can be built and validated. The publish workflow depends on package.json being complete (especially `repository.url` for OIDC).
+**Delivers:** Two GitHub Actions workflows -- ci.yml for test/build on push/PR, publish.yml for tag-triggered publish with OIDC and provenance.
+**Addresses:** CI workflow, publish workflow, provenance, pre-release tag detection.
+**Avoids:** Pitfalls 5 (token security), 6 (pre-release as latest), 7 (no smoke test).
+**Includes:** Smoke test step that installs the tarball in a clean directory and verifies both runtime import and type resolution.
 
-### Phase 3: Fetching, Configuration, and Public API
+### Phase 3: First Publish and Verification
 
-**Rationale:** Adds I/O layer on top of the tested core. The factory wires everything together and produces the public API surface. This is where the library becomes usable end-to-end.
-**Delivers:** HTTP(S) list fetcher with error handling, config validator, `createDomainFirewall()` factory function, public API (`start()`, `stop()`, `isDomainBlocked()`), graceful failure on bad sources
-**Addresses:** Remote list fetching, graceful failure, programmatic start/stop lifecycle, multiple concurrent list sources
-**Avoids:** Pitfall 5 (silent fetch failures), Pitfall 4 (memory -- deduplicate across lists into single Set)
-
-### Phase 4: Refresh, Presets, and Production Hardening
-
-**Rationale:** Lifecycle management and zero-config experience. Depends on the fetcher and factory from Phase 3. Presets are just config objects but they complete the "works out of the box" story.
-**Delivers:** Periodic refresh with atomic swap, built-in presets (StevenBlack, Hagezi), timer cleanup on stop, AbortController integration
-**Addresses:** Periodic refresh, built-in presets, event callbacks (optional)
-**Avoids:** Pitfall 6 (refresh race conditions -- atomic swap), Pitfall 8 (timer leaks -- unref + clearInterval), Pitfall 12 (stale preset URLs -- graceful degradation)
+**Rationale:** OIDC trusted publishing cannot be configured until the package exists on npm. This phase handles the one-time manual bootstrap and end-to-end verification.
+**Delivers:** Package live on npmjs.com with provenance badge, OIDC trusted publishing configured for all future releases.
+**Addresses:** Initial manual publish, OIDC trusted publisher setup on npmjs.com, verification that provenance badge displays.
+**Includes:** Version set to 1.0.0, manual publish with short-lived granular token, configure trusted publisher, tag a second release to verify automated pipeline end-to-end.
 
 ### Phase Ordering Rationale
 
-- **Inside-out build order:** Pure functions first (normalizer, parser, index), then orchestration (lookup engine), then I/O (fetcher, factory), then lifecycle (refresh, presets). Each phase depends only on the previous one.
-- **Correctness before convenience:** Matching logic must be bulletproof before adding network I/O. A fetch bug is recoverable; a matching bug silently blocks or allows the wrong domains.
-- **Pitfall alignment:** The most critical pitfalls (1, 2, 7) are addressed in Phase 1 where they can be caught early with comprehensive unit tests. Race conditions (Pitfall 6) are isolated to Phase 4 where the atomic swap pattern is straightforward.
+- Package configuration MUST come first because both CI validation and publish depend on correct exports, types, and files fields.
+- CI/CD pipeline comes second because it builds on the validated package configuration and provides the automation for Phase 3.
+- First publish is last because it requires both configuration and CI/CD to be complete, and the OIDC setup has a chicken-and-egg dependency on the package existing on npm first.
+- The three phases have strict sequential dependencies -- no parallelism is possible.
 
 ### Research Flags
 
 Phases likely needing deeper research during planning:
-- **Phase 1:** Worth verifying real StevenBlack and Hagezi file formats against live downloads during implementation. The parser edge cases (Pitfall 1) are best validated with actual data, not assumptions.
-- **Phase 3:** The public API shape (`createDomainFirewall` config object, return type) deserves careful design. Look at comparable libraries (e.g., `node-cron` for lifecycle patterns) for API ergonomics.
+- **Phase 2 (CI/CD):** npm CLI version requirements for OIDC trusted publishing (needs npm 11.5.1+ but Node 22 ships npm 10.x -- may need explicit `npm install -g npm@latest` step). Also: exact smoke test implementation details and pre-release tag detection logic.
+- **Phase 3 (First Publish):** npmjs.com trusted publisher UI setup steps; verify exact workflow filename and environment configuration requirements.
 
 Phases with standard patterns (skip research-phase):
-- **Phase 2:** The precedence chain (allow > deny > blocklist) is a simple, well-defined pattern. No research needed.
-- **Phase 4:** `setInterval` + atomic swap + `AbortController` are all standard Node.js patterns. No research needed.
+- **Phase 1 (Package Configuration):** Well-documented patterns with official TypeScript and npm documentation. All changes are package.json and tsconfig.json fields with clear specifications.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | MEDIUM | Versions from training data (May 2025 cutoff). Verify tsup, vitest, Biome versions before `npm install`. Core choices (TypeScript, ESM-only, zero deps) are HIGH confidence. |
-| Features | MEDIUM | Based on well-established Pi-hole/AdGuard/uBlock ecosystem knowledge. The feature landscape is stable -- these tools haven't changed their core feature sets in years. |
-| Architecture | HIGH | The fetch-parse-normalize-index-lookup pipeline is universal across all DNS blocklist systems. Set-based suffix walking is well-understood algorithmically. |
-| Pitfalls | MEDIUM | Based on training data knowledge of real-world blocklist parsing issues. Recommend validating with live list downloads during Phase 1 implementation. |
+| Stack | HIGH | Existing stack is proven; new additions (publint, attw) are standard tools with official docs |
+| Features | HIGH | npm package.json fields are well-specified; feature list matches official npm and TypeScript publishing guides |
+| Architecture | HIGH | CI/CD patterns are standard GitHub Actions; OIDC trusted publishing has official npm documentation |
+| Pitfalls | HIGH | All pitfalls sourced from official npm/TypeScript docs and verified community reports; moduleResolution issue confirmed by inspecting current tsconfig |
 
-**Overall confidence:** MEDIUM -- the domain is well-established and patterns are proven, but no live verification was possible. The main uncertainty is around specific version numbers and real-world list format edge cases.
+**Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Version verification:** All dev dependency versions need verification against npm registry before installation. Run `npm view <pkg> version` for each.
-- **Real list format validation:** Parsers should be validated against actual StevenBlack and Hagezi downloads during Phase 1 development, not just synthetic test data.
-- **Memory benchmarking:** The 15-30 MB estimate for 200K domains in a Set is theoretical. Benchmark with `process.memoryUsage()` during Phase 1 to confirm.
-- **Preset URL stability:** The specific GitHub raw URLs for StevenBlack and Hagezi presets need to be verified as current before hardcoding in Phase 4.
+- **npm CLI version for OIDC:** Node 22 ships npm 10.x but trusted publishing requires npm 11.5.1+. Verify at implementation time whether `actions/setup-node@v4` with Node 22 includes a compatible npm version, or if an explicit npm upgrade step is needed.
+- **declarationMap decision:** Source maps in `.d.ts.map` files reference `src/` which is not published. Either include `src/` in the `files` array (increases package size) or disable `declarationMap` (loses IDE "go to definition" into source). Decide during Phase 1 implementation.
+- **First publish bootstrapping:** The exact flow for initial manual publish with a granular token before OIDC is configured needs validation. Granular tokens have 90-day max expiry -- verify one can be created with sufficient scope for a single package.
+- **README content for npm:** The current README may be developer-oriented rather than consumer-oriented. It should lead with `npm install` and quick-start usage for the npmjs.com listing. Evaluate during Phase 1.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Hosts file format conventions -- decades-old de facto standard, unchanged
-- V8 Set/Map performance characteristics -- fundamental CS + well-known engine behavior
-- Node.js 18+ built-in APIs (fetch, AbortController, URL) -- stable, documented
+- [TypeScript: Choosing Compiler Options](https://www.typescriptlang.org/docs/handbook/modules/guides/choosing-compiler-options.html)
+- [npm Trusted Publishing docs](https://docs.npmjs.com/trusted-publishers/)
+- [npm Provenance docs](https://docs.npmjs.com/generating-provenance-statements/)
+- [Node.js: Publishing a TypeScript package](https://nodejs.org/en/learn/typescript/publishing-a-ts-package)
+- [npm package.json documentation](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/)
+- [npm CLI wiki: Files & Ignores](https://github.com/npm/cli/wiki/Files-&-Ignores)
+- [npm classic tokens revoked (Dec 2025)](https://github.blog/changelog/2025-12-09-npm-classic-tokens-revoked-session-based-auth-and-cli-token-management-now-available/)
 
 ### Secondary (MEDIUM confidence)
-- Pi-hole architecture and FTL engine design -- stable, well-documented open source project
-- uBlock Origin hostname trie approach -- documented in wiki and source
-- StevenBlack/hosts and Hagezi list formats and conventions -- active, well-maintained projects
-- tsup, vitest, Biome documentation and ecosystem positioning
-
-### Tertiary (LOW confidence)
-- Specific version numbers for dev dependencies -- training data cutoff May 2025, verify before use
-- Memory estimates for large Sets -- rough calculations, need benchmarking
+- [Andrew Branch: Is nodenext right for libraries?](https://blog.andrewbran.ch/is-nodenext-right-for-libraries-that-dont-target-node-js/)
+- [2ality: Publishing ESM-based npm packages with TypeScript](https://2ality.com/2025/02/typescript-esm-packages.html)
+- [Sindresorhus: Pure ESM package guide](https://gist.github.com/sindresorhus/a39789f98801d908bbc7ff3ecc99d99c)
+- [Phil Nash: npm trusted publishing tips (Jan 2026)](https://philna.sh/blog/2026/01/28/trusted-publishing-npm/)
+- [publint rules reference](https://publint.dev/rules)
 
 ---
 *Research completed: 2026-03-08*
